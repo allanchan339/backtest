@@ -54,12 +54,9 @@ def datafeedMysql(tickers, beginDate, endDate, clean_tickers = True, common_date
     #             tickers), [clean_tickers]*len(tickers))):
     #         df_list.append(file)
     with concurrent.futures.ProcessPoolExecutor() as executor:
-
         df_list = executor.map(readMysql, tickers, itertools.repeat(beginDate), itertools.repeat(endDate),
                                itertools.repeat(clean_tickers))
         df_list = list(df_list) # is a bad written method ?
-
-
 
     for df in df_list:
         temp = temp.join(df)
