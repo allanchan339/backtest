@@ -18,25 +18,15 @@ if platform.system() != 'Linux':  # to show plt
     matplotlib.use('tkagg')
 
 
-class GeniticAlgo:  # nothing to inheritance
-    # multi processing inside the class?
-    def __init__(self, tickers_GA, prices_pool):
-        self.tickers_GA = tickers_GA
-        self.prices_pool = prices_pool
-
-    def extractPrices(self, prices_pool):
-        pass
-
-
-def pricesFilter(prices_pool, lowerIndex, upperIndex, bool_dropna):
-    lowerIndex = datetime.datetime.strftime(lowerIndex, '%Y-%m-%d')
-    upperIndex = datetime.datetime.strftime(upperIndex, '%Y-%m-%d')
-    prices_pool = prices_pool.loc[prices_pool.index > lowerIndex]
-    prices_pool = prices_pool.loc[prices_pool.index < upperIndex]
-    #TODO: identify ticker who is empty within these year, and drop it, and update tickers_pool
-    if bool_dropna:
-        prices_pool = prices_pool.dropna()
-    return prices_pool
+# def pricesFilter(prices_pool, lowerIndex, upperIndex, bool_dropna):
+#     lowerIndex = datetime.datetime.strftime(lowerIndex, '%Y-%m-%d')
+#     upperIndex = datetime.datetime.strftime(upperIndex, '%Y-%m-%d')
+#     prices_pool = prices_pool.loc[prices_pool.index > lowerIndex]
+#     prices_pool = prices_pool.loc[prices_pool.index < upperIndex]
+#     ##TODO: identify ticker who is empty within these year, and drop it, and update tickers_pool
+#     if bool_dropna:
+#         prices_pool = prices_pool.dropna()
+#     return prices_pool
 
 
 startTime = datetime.datetime.now()
@@ -48,14 +38,12 @@ tickers_pool = list(set(tickers_pool))
 tickers_pool.remove('OTIS')  # the backtest period is too short
 tickers_pool.remove('CARR')  # same problem
 tickers_pool.remove('TT')
-beginDate = datetime.date(2010, 1, 1)
+beginDate = datetime.date(2013, 1, 1)
 endDate = datetime.date.today()
-lowerIndex = datetime.date(2015, 1, 1)
-upperIndex = datetime.date(2018, 1, 1)
-prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, lowerIndex, upperIndex, clean_tickers = False, common_dates =
-False)
-prices_pool = pricesFilter(prices_pool, lowerIndex, upperIndex, False)
-print(prices_pool)
+prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate, clean_tickers = False, common_dates =
+True)
+# prices_pool = pricesFilter(prices_pool, lowerIndex, upperIndex, False)
+# print(prices_pool)
 
 
 # start GA
@@ -96,8 +84,8 @@ def f(X):
     CAGR = float(str(CAGR).strip('%'))
     calmar = report_df.loc['Calmar Ratio'].values
     calmar = float(calmar)
-    print(tickers)
-    print(report_df.head(10))
+    # print(tickers)
+    # print(report_df.head(10))
     if report_df.loc['Win 12m %'].values == '-':
         return 0
     # elif calmar > 3:
@@ -125,7 +113,9 @@ def geneticAlgo(tickers_size):
                        'crossover_probability': 0.5,
                        'parents_portion': 0.3,
                        'crossover_type': 'uniform',
-                       'max_iteration_without_improv': 500}
+                       'max_iteration_without_improv': 500,
+                       'multiprocessing_ncpus': 24,
+                       'multiprocessing_engine': None}
     model = ga(function = f,
                dimension = tickers_size,
                variable_type = 'int',
