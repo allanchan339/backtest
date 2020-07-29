@@ -92,21 +92,23 @@ def f(X):
     # X is a list, storing my genes
     # use it and calculate calmar ratio, then -ve it
     report_df, tickers = showResult(X)
+    CAGR = report_df.loc['CAGR'].values.tolist()[0]
+    CAGR = float(str(CAGR).strip('%'))
     calmar = report_df.loc['Calmar Ratio'].values
     calmar = float(calmar)
     print(tickers)
     print(report_df.head(10))
     if report_df.loc['Win 12m %'].values == '-':
         return 0
-    elif calmar > 3:
-        return -0.1 * calmar
-    return -calmar  # well i need to max.
+    # elif calmar > 3:
+    #     return -0.1 * calmar
+    return -0.4*CAGR + 0.6*(-calmar + max(calmar - 3, 0)) # well i need to max.
 
 
-def g(X):
-    # X is a weight
-    500 * abs(np.sum(X) - 1) - calmer
-    pass
+# def g(X):
+#     # X is a weight
+#     500 * abs(np.sum(X) - 1) - calmer
+#     pass
 
 
 def geneticAlgo(tickers_size):

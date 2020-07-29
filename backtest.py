@@ -8,6 +8,7 @@ import concurrent.futures
 import pandas_market_calendars
 import itertools
 
+
 def conn():
     username = 'root'  # 資料庫帳號
     password = 'root'  # 資料庫密碼
@@ -56,16 +57,23 @@ def datafeedMysql(tickers, beginDate, endDate, clean_tickers = True, common_date
     with concurrent.futures.ProcessPoolExecutor() as executor:
         df_list = executor.map(readMysql, tickers, itertools.repeat(beginDate), itertools.repeat(endDate),
                                itertools.repeat(clean_tickers))
-        df_list = list(df_list) # is a bad written method ?
+        df_list = list(df_list)  # is a bad written method ?
 
     for df in df_list:
         if df.empty:
             tickers.remove(df.columns)
         else:
             temp = temp.join(df)
-    while all(temp.iloc[-1].isnull().values.tolist()):
-        temp = temp.head(-1)
+
+    while all(temp.iloc[-1].isnull().values.tolist()):  # if last row is all empty
+        temp = temp.head(-1)  # is used to kill the last row
+
     if common_dates:
+        temp1 = temp.head(1)
+        is_NaN = temp1.isnull()
+        is_NaN = is_NaN.columns[(is_NaN > 0).all()].values.tolist()
+        temp.drop(columns = is_NaN, inplace = True)
+        tickers = [ticker for ticker in tickers if ticker not in is_NaN]
         temp.dropna(inplace = True)
     return temp, tickers
 
