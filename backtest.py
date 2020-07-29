@@ -59,10 +59,15 @@ def datafeedMysql(tickers, beginDate, endDate, clean_tickers = True, common_date
         df_list = list(df_list) # is a bad written method ?
 
     for df in df_list:
-        temp = temp.join(df)
+        if df.empty:
+            tickers.remove(df.columns)
+        else:
+            temp = temp.join(df)
+    while all(temp.iloc[-1].isnull().values.tolist()):
+        temp = temp.head(-1)
     if common_dates:
         temp.dropna(inplace = True)
-    return temp
+    return temp, tickers
 
 
 def readReportCSV(report):

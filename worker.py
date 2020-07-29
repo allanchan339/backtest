@@ -10,8 +10,8 @@ import numpy as np
 from geneticalgorithm import geneticalgorithm as ga
 
 # pd.set_option('display.max_rows', None)
-# pd.set_option('display.max_columns', None)
-# pd.set_option('display.width', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', None)
 # pd.set_option('display.max_colwidth', None)
 
 if platform.system() != 'Linux':  # to show plt
@@ -28,20 +28,34 @@ class GeniticAlgo:  # nothing to inheritance
         pass
 
 
+def pricesFilter(prices_pool, lowerIndex, upperIndex, bool_dropna):
+    lowerIndex = datetime.datetime.strftime(lowerIndex, '%Y-%m-%d')
+    upperIndex = datetime.datetime.strftime(upperIndex, '%Y-%m-%d')
+    prices_pool = prices_pool.loc[prices_pool.index > lowerIndex]
+    prices_pool = prices_pool.loc[prices_pool.index < upperIndex]
+    #TODO: identify ticker who is empty within these year, and drop it, and update tickers_pool
+    if bool_dropna:
+        prices_pool = prices_pool.dropna()
+    return prices_pool
+
+
 startTime = datetime.datetime.now()
 tickers_pool = backtest.SPXlist()
 tickers_pool += backtest.ETFlist()
 extra = ['TMF', 'SOXL', 'ARKW', 'ARKK', 'SMH', 'SOXX']
 tickers_pool += extra
 tickers_pool = list(set(tickers_pool))
-
+tickers_pool.remove('OTIS')  # the backtest period is too short
+tickers_pool.remove('CARR')  # same problem
+tickers_pool.remove('TT')
 beginDate = datetime.date(2010, 1, 1)
 endDate = datetime.date.today()
-
-prices_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate, clean_tickers = False, common_dates = False)
+lowerIndex = datetime.date(2015, 1, 1)
+upperIndex = datetime.date(2018, 1, 1)
+prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, lowerIndex, upperIndex, clean_tickers = False, common_dates =
+False)
+prices_pool = pricesFilter(prices_pool, lowerIndex, upperIndex, False)
 print(prices_pool)
-finishTime = datetime.datetime.now()
-print(f'We need {finishTime - startTime} to collect data')
 
 
 # start GA
@@ -52,6 +66,17 @@ print(f'We need {finishTime - startTime} to collect data')
 # use calmer ratio as my obj function
 # 5% from max - min , stop ?
 # alert then show the top5 outcome, and display result?
+
+class ApplyLeverage(bt.Algo):
+
+    def __init__(self, leverage):
+        super(ApplyLeverage, self).__init__()
+        self.leverage = leverage
+
+    def __call__(self, target):
+        target.temp['weights'] = target.temp['weights'] * self.leverage
+        return True
+
 
 def checkDuplicate(X):
     temp = len(X)
@@ -67,12 +92,24 @@ def f(X):
     # X is a list, storing my genes
     # use it and calculate calmar ratio, then -ve it
     report_df, tickers = showResult(X)
-    calmer = report_df.loc['Calmar Ratio'].values
-    calmer = float(calmer)
-    return -calmer  # well i need to max.
+    calmar = report_df.loc['Calmar Ratio'].values
+    calmar = float(calmar)
+    print(tickers)
+    print(report_df.head(10))
+    if report_df.loc['Win 12m %'].values == '-':
+        return 0
+    elif calmar > 3:
+        return -0.1 * calmar
+    return -calmar  # well i need to max.
 
 
-def geniticAlgo(tickers_size):
+def g(X):
+    # X is a weight
+    500 * abs(np.sum(X) - 1) - calmer
+    pass
+
+
+def geneticAlgo(tickers_size):
     # varbound = np.array([[0.5, 1.5], [1, 100], [0, 1]])
     varbound = np.array([[0, len(tickers_pool) - 1]] * tickers_size)
     # remember to count down 1
@@ -102,7 +139,6 @@ def geniticAlgo(tickers_size):
 
 def showResult(root_list):
     tickers = [tickers_pool[int(i)] for i in root_list]
-
     prices = prices_pool[tickers].dropna()  # TODO: to change to local var, without speed slowdown
     equal = bt.Strategy('Equal',
                         algos = [
@@ -112,14 +148,28 @@ def showResult(root_list):
                                 bt.algos.Rebalance(),
                                 ]
                         )
+    inverseVol = bt.Strategy('InverseVol',
+                             algos = [
+                                     bt.algos.RunMonthly(),
+                                     bt.algos.SelectAll(),
+                                     bt.algos.WeighInvVol(),
+                                     ApplyLeverage(1.),
+                                     bt.algos.Rebalance(),
+                                     ]
+                             )
     backtest_equal = bt.Backtest(equal, prices)
-    report = bt.run(backtest_equal)
+    backtest_inverese = bt.Backtest(inverseVol, prices)
+    # report = bt.run(backtest_equal)
+    report = bt.run(backtest_inverese)
     report_df = backtest.readReportCSV(report)
     return report_df, tickers
 
-
-root_list = geniticAlgo(5)
+root_list = geneticAlgo(10)
 
 report_df, tickers = showResult(root_list)
 print(tickers)
 print(report_df)
+finishTime = datetime.datetime.now()
+print(f'We need {finishTime - startTime} to calculate')
+
+# _sum_weight = 100%
