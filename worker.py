@@ -9,6 +9,9 @@ import random
 import numpy as np
 from geneticalgorithm import geneticalgorithm as ga
 
+
+startTime = datetime.datetime.now()
+
 # pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
@@ -17,43 +20,6 @@ pd.set_option('display.width', None)
 if platform.system() != 'Linux':  # to show plt
     matplotlib.use('tkagg')
 
-
-# def pricesFilter(prices_pool, lowerIndex, upperIndex, bool_dropna):
-#     lowerIndex = datetime.datetime.strftime(lowerIndex, '%Y-%m-%d')
-#     upperIndex = datetime.datetime.strftime(upperIndex, '%Y-%m-%d')
-#     prices_pool = prices_pool.loc[prices_pool.index > lowerIndex]
-#     prices_pool = prices_pool.loc[prices_pool.index < upperIndex]
-#     ##TODO: identify ticker who is empty within these year, and drop it, and update tickers_pool
-#     if bool_dropna:
-#         prices_pool = prices_pool.dropna()
-#     return prices_pool
-
-
-startTime = datetime.datetime.now()
-tickers_pool = backtest.SPXlist()
-tickers_pool += backtest.ETFlist()
-extra = ['TMF', 'SOXL', 'ARKW', 'ARKK', 'SMH', 'SOXX']
-tickers_pool += extra
-tickers_pool = list(set(tickers_pool))
-tickers_pool.remove('OTIS')  # the backtest period is too short
-tickers_pool.remove('CARR')  # same problem
-tickers_pool.remove('TT')
-beginDate = datetime.date(2013, 1, 1)
-endDate = datetime.date.today()
-prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate, clean_tickers = False, common_dates =
-True)
-# prices_pool = pricesFilter(prices_pool, lowerIndex, upperIndex, False)
-# print(prices_pool)
-
-
-# start GA
-# workflow
-# random get ticker, flexible number, to 1000 father??
-# GA to optim, step store into mysql algo, mutant gen with prob.
-# will i use Microbial GA?
-# use calmer ratio as my obj function
-# 5% from max - min , stop ?
-# alert then show the top5 outcome, and display result?
 
 class ApplyLeverage(bt.Algo):
 
@@ -66,72 +32,18 @@ class ApplyLeverage(bt.Algo):
         return True
 
 
-def checkDuplicate(X):
-    temp = len(X)
-    X = list(set(X))
-    while len(X) != temp:
-        X.append(random.randint(min(X), max(X)))
-        X = list(set(X))
-    return X
-
-
-def f(X):
-    X = checkDuplicate(X)
-    # X is a list, storing my genes
-    # use it and calculate calmar ratio, then -ve it
-    report_df, tickers = showResult(X)
-    CAGR = report_df.loc['CAGR'].values.tolist()[0]
-    CAGR = float(str(CAGR).strip('%'))
-    calmar = report_df.loc['Calmar Ratio'].values
-    calmar = float(calmar)
-    # print(tickers)
-    # print(report_df.head(10))
-    if report_df.loc['Win 12m %'].values == '-':
-        return 0
-    # elif calmar > 3:
-    #     return -0.1 * calmar
-    return -0.4*CAGR + 0.6*(-calmar + max(calmar - 3, 0)) # well i need to max.
-
-
-# def g(X):
-#     # X is a weight
-#     500 * abs(np.sum(X) - 1) - calmer
-#     pass
-
-
-def geneticAlgo(tickers_size):
-    # varbound = np.array([[0.5, 1.5], [1, 100], [0, 1]])
-    varbound = np.array([[0, len(tickers_pool) - 1]] * tickers_size)
-    # remember to count down 1
-    # vartype = np.array([['real'], ['int'], ['int']])
-    vartype = np.array([['int'] * tickers_size])
-
-    algorithm_param = {'max_num_iteration': None,
-                       'population_size': 50,
-                       'mutation_probability': 0.1,
-                       'elit_ratio': 0.01,
-                       'crossover_probability': 0.5,
-                       'parents_portion': 0.3,
-                       'crossover_type': 'uniform',
-                       'max_iteration_without_improv': 500,
-                       'multiprocessing_ncpus': 24,
-                       'multiprocessing_engine': None}
-    model = ga(function = f,
-               dimension = tickers_size,
-               variable_type = 'int',
-               # variable_type_mixed = vartype
-               variable_boundaries = varbound,
-               algorithm_parameters = algorithm_param)
-    model.run()
-    solution = model.output_dict
-    df = pd.DataFrame.from_dict(solution)
-    root_list = df['variable'].values.tolist()
-    return root_list
-
+class GenAlgo(object):
+    def __init__(self, tickers_size, algorithm_param, tickers_pool, beginDate, endDate):
+        self.tickers_size = tickers_size
+        self.algorithm_param = algorithm_param
+        self.tickers_pool = tickers_pool
+        self.beginDate = beginDate
+        self.endDate = endDate
+        self.root_list = []
 
 def showResult(root_list):
     tickers = [tickers_pool[int(i)] for i in root_list]
-    prices = prices_pool[tickers].dropna()  # TODO: to change to local var, without speed slowdown
+    prices = prices_pool[tickers].dropna() 
     equal = bt.Strategy('Equal',
                         algos = [
                                 bt.algos.RunOnce(),
@@ -156,12 +68,101 @@ def showResult(root_list):
     report_df = backtest.readReportCSV(report)
     return report_df, tickers
 
-root_list = geneticAlgo(10)
 
-report_df, tickers = showResult(root_list)
-print(tickers)
-print(report_df)
-finishTime = datetime.datetime.now()
-print(f'We need {finishTime - startTime} to calculate')
+def create_algorithm_param(max_num_iteration = None, population_size = 50, max_iteration_without_improv = 100,
+                           multiprocessing_ncpus = 24):
+    algorithm_param = {'max_num_iteration': max_num_iteration,
+                       'population_size': population_size,
+                       'mutation_probability': 0.1,
+                       'elit_ratio': 0.01,
+                       'crossover_probability': 0.5,
+                       'parents_portion': 0.3,
+                       'crossover_type': 'uniform',
+                       'max_iteration_without_improv': max_iteration_without_improv,
+                       'multiprocessing_ncpus': multiprocessing_ncpus,
+                       'multiprocessing_engine': None}
+    return algorithm_param
 
-# _sum_weight = 100%
+
+def checkDuplicate(X):
+    temp = len(X)
+    X = list(set(X))
+    while len(X) != temp:
+        X.append(random.randint(min(X), max(X)))
+        X = list(set(X))
+    return X
+
+
+def f(X):
+    X = checkDuplicate(X)
+    # X is a list, storing my genes
+    # use it and calculate calmar ratio, then -ve it
+    report_df, tickers = showResult(X) # is a really bad writing method
+    CAGR = report_df.loc['CAGR'].values.tolist()[0]
+    CAGR = float(str(CAGR).strip('%'))
+    calmar = report_df.loc['Calmar Ratio'].values
+    calmar = float(calmar)
+    # print(tickers)
+    # print(report_df.head(10))
+    if report_df.loc['Win 12m %'].values == '-':
+        return 0
+    # elif calmar > 3:
+    #     return -0.1 * calmar
+    return -0.4 * CAGR + 0.6 * (-calmar + max(calmar - 3, 0))  # well i need to max.
+
+
+def createTickerpool(bool_SPX = True, bool_ETF = True, bool_ALL = False, extra = None):
+    if bool_SPX:
+        tickers_pool = backtest.SPXlist()
+    if bool_ETF:
+        tickers_pool += backtest.ETFlist()
+    if bool_ALL:
+        tickers_pool += backtest.code_list()
+    if extra is not None:
+        tickers_pool += extra
+
+    tickers_pool = list(set(tickers_pool))
+    tickers_pool.remove('TT')  # the data in yahoo is problematic
+    return tickers_pool
+
+def start(tickers_size, tickers_pool, algorithm_param):
+    # varbound = np.array([[0.5, 1.5], [1, 100], [0, 1]])
+    varbound = np.array([[0, len(tickers_pool) - 1]] * tickers_size)
+    # remember to count down 1
+    # vartype = np.array([['real'], ['int'], ['int']])
+    vartype = np.array([['int'] * tickers_size])
+
+    model = ga(function = f, #i cant submit a self.f to ga lib
+               dimension = tickers_size,
+               variable_type = 'int',
+               # variable_type_mixed = vartype
+               variable_boundaries = varbound,
+               algorithm_parameters = algorithm_param)
+    model.run()
+    solution = model.output_dict
+    df = pd.DataFrame.from_dict(solution)
+    root_list = df['variable'].values.tolist()
+    return root_list
+
+
+def main():
+    global prices_pool, tickers_pool
+    extra = ['TMF', 'SOXL', 'ARKW', 'ARKK', 'SMH', 'SOXX']
+    tickers_pool = createTickerpool(extra = extra)
+    algorithm_param = create_algorithm_param(max_num_iteration = None, population_size = 500)
+    beginDate = datetime.date(2014, 1, 1)
+    endDate = datetime.date.today()
+    tickers_size = 10
+    prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate,
+                                                       clean_tickers = False,
+                                                       common_dates =
+                                                       True)
+    root_list = start(tickers_size, tickers_pool, algorithm_param)
+    report_df, tickers = showResult(root_list)
+    print(tickers)
+    print(report_df)
+
+    endTime = datetime.datetime.now()
+    print(endTime - startTime)
+if __name__ == '__main__':
+    main()

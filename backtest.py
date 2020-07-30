@@ -78,6 +78,14 @@ def datafeedMysql(tickers, beginDate, endDate, clean_tickers = True, common_date
     return temp, tickers
 
 
+def code_list():
+    engine = conn()
+    code = pd.read_sql_table('TICKER', engine)
+    code = code['code'].values.tolist()
+    engine.dispose()
+    return code
+
+
 def readReportCSV(report):
     temp = report.to_csv()
     temp = temp.replace(',,', '')  # drop if the line is blank only
