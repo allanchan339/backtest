@@ -78,13 +78,27 @@ def datafeedMysql(tickers, beginDate, endDate, clean_tickers = True, common_date
     return temp, tickers
 
 
-def code_list():
-    engine = conn()
-    code = pd.read_sql_table('TICKER', engine)
-    code = code['code'].values.tolist()
-    engine.dispose()
-    return code
+def code_list(bool_ALL = True, bool_SPX = True, bool_ETF = True, engine = None, extra_tickers = None):
+    if engine is None:
+        engine = conn()
+    connect = engine.connect()
 
+    SPXlist = pd.read_sql_table('SPXlist', connect)['code'].values.tolist()
+    ETFlist = pd.read_sql_table('ETFlist', connect)['code'].values.tolist()
+    code = pd.read_sql_table('TICKER', connect)['code'].values.tolist()
+    print(len(SPXlist), len(ETFlist), len(code))
+    connect.close()
+    engine.dispose()
+
+    if bool_SPX and bool_ETF:
+        code = SPXlist + ETFlist
+    elif bool_SPX:
+        code = SPXlist
+    elif bool_ETF:
+        code = ETFlist
+    if extra_tickers is not None:
+        code += extra_tickers
+    return code
 
 def readReportCSV(report):
     temp = report.to_csv()

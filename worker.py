@@ -8,7 +8,7 @@ import datetime
 import random
 import numpy as np
 from geneticalgorithm import geneticalgorithm as ga
-
+import os
 startTime = datetime.datetime.now()
 
 # pd.set_option('display.max_rows', None)
@@ -70,7 +70,7 @@ def showResult(root_list):
 
 
 def create_algorithm_param(max_num_iteration = None, population_size = 50, max_iteration_without_improv = 100,
-                           multiprocessing_ncpus = 24):
+                           multiprocessing_ncpus = os.cpu_count()):
     algorithm_param = {'max_num_iteration': max_num_iteration,
                        'population_size': population_size,
                        'mutation_probability': 0.1,
@@ -111,16 +111,8 @@ def f(X):
     return -0.4 * CAGR + 0.6 * (-calmar + max(calmar - 3, 0))  # well i need to max.
 
 
-def createTickerpool(bool_SPX = True, bool_ETF = True, bool_ALL = False, extra = None):
-    if bool_SPX:
-        tickers_pool = backtest.SPXlist()
-    if bool_ETF:
-        tickers_pool += backtest.ETFlist()
-    if bool_ALL:
-        tickers_pool += backtest.code_list()
-    if extra is not None:
-        tickers_pool += extra
-
+def createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = True, engine = None, extra_tickers = None):
+    tickers_pool = backtest.code_list(bool_ALL, bool_SPX, bool_ETF, engine, extra_tickers)
     tickers_pool = list(set(tickers_pool))
     tickers_pool.remove('TT')  # the data in yahoo is problematic
     return tickers_pool
@@ -149,11 +141,11 @@ def start(tickers_size, tickers_pool, algorithm_param):
 def main():
     global prices_pool, tickers_pool
     extra = ['TMF', 'SOXL', 'ARKW', 'ARKK', 'SMH', 'SOXX']
-    tickers_pool = createTickerpool(extra = extra)
+    tickers_pool = createTickerpool(extra_tickers = extra)
     algorithm_param = create_algorithm_param(max_num_iteration = None, population_size = 500)
     beginDate = datetime.date(2010, 1, 1)
     endDate = datetime.date.today()
-    tickers_size = 13
+    tickers_size = 10
     prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate,
                                                        clean_tickers = False,
                                                        common_dates =
@@ -164,7 +156,7 @@ def main():
     print(report_df)
 
     endTime = datetime.datetime.now()
-    print(endTime - startTime)
+    print(f'{endTime - startTime} is used')
 
 
 if __name__ == '__main__':
