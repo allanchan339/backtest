@@ -145,7 +145,7 @@ def main():
     algorithm_param = create_algorithm_param(max_num_iteration = None, population_size = 500)
     beginDate = datetime.date(2010, 1, 1)
     endDate = datetime.date.today()
-    tickers_size = 10
+    tickers_size = 15
     prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate,
                                                        clean_tickers = False,
                                                        common_dates =
