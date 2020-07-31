@@ -9,7 +9,6 @@ import random
 import numpy as np
 from geneticalgorithm import geneticalgorithm as ga
 
-
 startTime = datetime.datetime.now()
 
 # pd.set_option('display.max_rows', None)
@@ -41,9 +40,10 @@ class GenAlgo(object):
         self.endDate = endDate
         self.root_list = []
 
+
 def showResult(root_list):
     tickers = [tickers_pool[int(i)] for i in root_list]
-    prices = prices_pool[tickers].dropna() 
+    prices = prices_pool[tickers].dropna()
     equal = bt.Strategy('Equal',
                         algos = [
                                 bt.algos.RunOnce(),
@@ -97,7 +97,7 @@ def f(X):
     X = checkDuplicate(X)
     # X is a list, storing my genes
     # use it and calculate calmar ratio, then -ve it
-    report_df, tickers = showResult(X) # is a really bad writing method
+    report_df, tickers = showResult(X)  # is a really bad writing method
     CAGR = report_df.loc['CAGR'].values.tolist()[0]
     CAGR = float(str(CAGR).strip('%'))
     calmar = report_df.loc['Calmar Ratio'].values
@@ -125,6 +125,7 @@ def createTickerpool(bool_SPX = True, bool_ETF = True, bool_ALL = False, extra =
     tickers_pool.remove('TT')  # the data in yahoo is problematic
     return tickers_pool
 
+
 def start(tickers_size, tickers_pool, algorithm_param):
     # varbound = np.array([[0.5, 1.5], [1, 100], [0, 1]])
     varbound = np.array([[0, len(tickers_pool) - 1]] * tickers_size)
@@ -132,7 +133,7 @@ def start(tickers_size, tickers_pool, algorithm_param):
     # vartype = np.array([['real'], ['int'], ['int']])
     vartype = np.array([['int'] * tickers_size])
 
-    model = ga(function = f, #i cant submit a self.f to ga lib
+    model = ga(function = f,  # i cant submit a self.f to ga lib
                dimension = tickers_size,
                variable_type = 'int',
                # variable_type_mixed = vartype
@@ -150,9 +151,9 @@ def main():
     extra = ['TMF', 'SOXL', 'ARKW', 'ARKK', 'SMH', 'SOXX']
     tickers_pool = createTickerpool(extra = extra)
     algorithm_param = create_algorithm_param(max_num_iteration = None, population_size = 500)
-    beginDate = datetime.date(2014, 1, 1)
+    beginDate = datetime.date(2010, 1, 1)
     endDate = datetime.date.today()
-    tickers_size = 10
+    tickers_size = 13
     prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate,
                                                        clean_tickers = False,
                                                        common_dates =
@@ -164,5 +165,7 @@ def main():
 
     endTime = datetime.datetime.now()
     print(endTime - startTime)
+
+
 if __name__ == '__main__':
     main()
