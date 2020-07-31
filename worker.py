@@ -9,6 +9,7 @@ import random
 import numpy as np
 from geneticalgorithm import geneticalgorithm as ga
 import os
+
 startTime = datetime.datetime.now()
 
 # pd.set_option('display.max_rows', None)
