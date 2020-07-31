@@ -16,8 +16,8 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
 # pd.set_option('display.max_colwidth', None)
 
-if platform.system() != 'Linux':  # to show plt
-    matplotlib.use('tkagg')
+# if platform.system() != 'Linux':  # to show plt
+#     matplotlib.use('tkagg')
 
 
 class ApplyLeverage(bt.Algo):

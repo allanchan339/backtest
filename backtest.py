@@ -86,8 +86,6 @@ def code_list(bool_ALL = True, bool_SPX = True, bool_ETF = True, engine = None, 
     SPXlist = pd.read_sql_table('SPXlist', connect)['code'].values.tolist()
     ETFlist = pd.read_sql_table('ETFlist', connect)['code'].values.tolist()
     code = pd.read_sql_table('TICKER', connect)['code'].values.tolist()
-    print(len(SPXlist), len(ETFlist), len(code))
-    connect.close()
     engine.dispose()
 
     if bool_SPX and bool_ETF:
@@ -140,14 +138,3 @@ def ETFlist():
         symbols += symbol
     return symbols
 
-
-def main():
-    tickers = ['SPY', 'AGG']
-    data = bt.get(tickers, start = '2010-01-01', )
-    print(data)
-    data0 = datafeedMysql(tickers)
-    print(data0)
-
-
-if __name__ == '__main__':
-    main()

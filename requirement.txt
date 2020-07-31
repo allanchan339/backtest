@@ -1,0 +1,4 @@
+pymysql
+bt
+geneticalgorithm
+pandas-market-calendars
