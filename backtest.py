@@ -87,7 +87,8 @@ def code_list(bool_ALL = True, bool_SPX = True, bool_ETF = True, engine = None, 
     ETFlist = pd.read_sql_table('ETFlist', connect)['code'].values.tolist()
     code = pd.read_sql_table('TICKER', connect)['code'].values.tolist()
     engine.dispose()
-
+    if bool_ALL:
+        return code #yes, extra must be bounded by ALL
     if bool_SPX and bool_ETF:
         code = SPXlist + ETFlist
     elif bool_SPX:
