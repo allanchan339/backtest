@@ -139,7 +139,7 @@ def start(tickers_size, tickers_pool, algorithm_param):
     return root_list
 
 
-def main():
+def main(root_list = None):
     global prices_pool, tickers_pool
     extra = ['TMF', 'SOXL', 'ARKW', 'ARKK', 'SMH', 'SOXX']
     tickers_pool = createTickerpool(extra_tickers = extra)
@@ -151,7 +151,9 @@ def main():
                                                        clean_tickers = False,
                                                        common_dates =
                                                        True)
-    root_list = start(tickers_size, tickers_pool, algorithm_param)
+    if root_list is None:
+        root_list = start(tickers_size, tickers_pool, algorithm_param)
+
     report_df, tickers = showResult(root_list)
     print(tickers)
     print(report_df)
@@ -161,4 +163,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    root_list_manual = None
+    # root_list_manual = [492., 424., 497., 267., 326., 267., 144., 161.,  91., 138., 432., 308., 242.]
+    # root_list_manual = list(set(root_list_manual))
+    main(root_list_manual)
