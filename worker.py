@@ -9,12 +9,15 @@ import random
 import numpy as np
 from geneticalgorithm import geneticalgorithm as ga
 import os
+from varname import nameof
 
 startTime = datetime.datetime.now()
 
 # pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
+
+
 # pd.set_option('display.max_colwidth', None)
 
 # if platform.system() != 'Linux':  # to show plt
@@ -42,8 +45,12 @@ class GenAlgo(object):
         self.root_list = []
 
 
-def showResult(root_list):
-    tickers = [tickers_pool[int(i)] for i in root_list]
+def showResult(root_list, savefig = False):
+    if all(isinstance(root, str) for root in root_list): #test if ticker is converted
+        tickers = root_list
+    else:
+        tickers = [tickers_pool[int(i)] for i in root_list]
+
     prices = prices_pool[tickers].dropna()
     equal = bt.Strategy('Equal',
                         algos = [
@@ -67,6 +74,20 @@ def showResult(root_list):
     # report = bt.run(backtest_equal)
     report = bt.run(backtest_inverese)
     report_df = backtest.readReportCSV(report)
+    if savefig:
+        plot_return = report.plot()
+        plt.savefig(nameof(plot_return))
+        plot_weights = report.plot_security_weights()
+        plt.savefig(nameof(plot_weights))
+        # plot_scatter_matrix = report.plot_scatter_matrix()
+        # plt.savefig(nameof(plot_scatter_matrix))
+        plot_correlation = report.plot_correlation()
+        plt.savefig(nameof(plot_correlation))
+        plot_histrograms = report.plot_histograms()
+        plt.savefig(nameof(plot_histrograms))
+        plot_prices = prices.plot()
+        plt.savefig(nameof(plot_prices))
+
     return report_df, tickers
 
 
@@ -144,26 +165,32 @@ def main(root_list = None):
     extra = ['TMF', 'SOXL', 'ARKW', 'ARKK', 'SMH', 'SOXX']
     tickers_pool = createTickerpool(extra_tickers = extra)
     algorithm_param = create_algorithm_param(max_num_iteration = None, population_size = 500)
-    beginDate = datetime.date(2010, 1, 1)
-    endDate = datetime.date.today()
-    tickers_size = 13
+    beginDate = datetime.date(2015, 7, 31)
+    endDate = datetime.date(2018, 7, 31)
+    tickers_size = 12
     prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate,
                                                        clean_tickers = False,
-                                                       common_dates =
-                                                       True)
+                                                       common_dates = True)
     if root_list is None:
         root_list = start(tickers_size, tickers_pool, algorithm_param)
 
-    report_df, tickers = showResult(root_list)
+    report_df, tickers = showResult(root_list, savefig = True)
     print(tickers)
     print(report_df)
+
+    if (datetime.date.today() - endDate) > datetime.timedelta(days = 7):  # if the end date is bigger than current week
+        prices_pool, tickers_pool = backtest.datafeedMysql(tickers, endDate, datetime.datetime.now(), False, True)
+        report_df, tickers = showResult(root_list, savefig = True)
+        print(tickers)
+        print(report_df)
 
     endTime = datetime.datetime.now()
     print(f'{endTime - startTime} is used')
 
 
 if __name__ == '__main__':
+    global prices_pool, tickers_pool
     root_list_manual = None
-    # root_list_manual = [492., 424., 497., 267., 326., 267., 144., 161.,  91., 138., 432., 308., 242.]
-    # root_list_manual = list(set(root_list_manual))
+    root_list_manual = ['LRCX', 'NOW', 'SCO', 'TQQQ', 'ALGN', 'MKTX', 'NVDA', 'ADSK', 'PAYC', 'AMD', 'NUGT', 'SOXL',
+                        'DRIP']
     main(root_list_manual)

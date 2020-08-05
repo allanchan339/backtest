@@ -7,7 +7,7 @@ import datetime
 import concurrent.futures
 import pandas_market_calendars
 import itertools
-
+import os
 
 def conn():
     username = 'root'  # 資料庫帳號
@@ -35,7 +35,7 @@ def createTradingpandas(beginDate, endDate):
 
 
 def readMysql(ticker, beginDate, endDate, clean_tickers = True):
-    sql = f''' SELECT Date, Close FROM `{ticker}` WHERE DATE(Date) >= '{beginDate}' AND DATE (Date) <= '{endDate}'
+    sql = f''' SELECT Date, Close FROM `{ticker}` WHERE DATE(Date) > '{beginDate}' AND DATE (Date) <= '{endDate}'
     '''
     engine = conn()
     df = pd.read_sql(sql, engine, index_col = 'Date')
@@ -51,14 +51,17 @@ def datafeedMysql(tickers, beginDate, endDate, clean_tickers = True, common_date
     temp = createTradingpandas(beginDate, endDate)
     df_list = []  # df_dict = {}
     # with concurrent.futures.ProcessPoolExecutor() as executor:
-    #     for i, file in zip(tickers, executor.map(readMysql, tickers, [beginDate] * len(tickers), [endDate] * len(
-    #             tickers), [clean_tickers]*len(tickers))):
-    #         df_list.append(file)
-    with concurrent.futures.ProcessPoolExecutor() as executor:
+        #using for loop is a much stable method
+        # for i, file in zip(tickers, executor.map(readMysql, tickers, itertools.repeat(beginDate), itertools.repeat(endDate),
+        #         itertools.repeat(clean_tickers))):
+        #     df_list.append(file)
+        #     print(df_list)
+   #to many connection will cause bugs??
+    with concurrent.futures.ProcessPoolExecutor(max_workers = min(int(os.cpu_count()), 12)) as executor:
         df_list = executor.map(readMysql, tickers, itertools.repeat(beginDate), itertools.repeat(endDate),
                                itertools.repeat(clean_tickers))
-        df_list = list(df_list)  # is a bad written method ?
-
+    df_list = list(df_list)  # only if the result take outside, the merge can be done
+    print(f'Combining {len(df_list)} tickers')
     for df in df_list:
         if df.empty:
             tickers.remove(df.columns)
