@@ -45,7 +45,7 @@ class GenAlgo(object):
         self.root_list = []
 
 
-def showResult(root_list, savefig = False):
+def showResult(root_list, tickers_pool, prices_pool, savefig = False):
     if all(isinstance(root, str) for root in root_list): #test if ticker is converted
         tickers = root_list
     else:
@@ -115,11 +115,13 @@ def checkDuplicate(X):
     return X
 
 
-def f(X):
+def f(X, kwargs):
+    tickers_pool = kwargs.get('tickers_pool')
+    prices_pool = kwargs.get('prices_pool')
     X = checkDuplicate(X)
     # X is a list, storing my genes
     # use it and calculate calmar ratio, then -ve it
-    report_df, tickers = showResult(X)  # is a really bad writing method
+    report_df, tickers = showResult(X, tickers_pool, prices_pool)  # is a really bad writing method
     CAGR = report_df.loc['CAGR'].values.tolist()[0]
     CAGR = float(str(CAGR).strip('%'))
     calmar = report_df.loc['Calmar Ratio'].values
@@ -133,14 +135,14 @@ def f(X):
     return -0.4 * CAGR + 0.6 * (-calmar + max(calmar - 3, 0))  # well i need to max.
 
 
-def createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = True, engine = None, extra_tickers = None):
-    tickers_pool = backtest.code_list(bool_ALL, bool_SPX, bool_ETF, engine, extra_tickers)
-    tickers_pool = list(set(tickers_pool))
+def createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = True, bool_levETF = True, engine = None,
+                     extra_tickers = None):
+    tickers_pool = backtest.code_list(bool_ALL, bool_SPX, bool_ETF, bool_levETF, engine, extra_tickers)
     tickers_pool.remove('TT')  # the data in yahoo is problematic
     return tickers_pool
 
 
-def start(tickers_size, tickers_pool, algorithm_param):
+def start(tickers_size, tickers_pool, prices_pool, algorithm_param):
     # varbound = np.array([[0.5, 1.5], [1, 100], [0, 1]])
     varbound = np.array([[0, len(tickers_pool) - 1]] * tickers_size)
     # remember to count down 1
@@ -152,7 +154,9 @@ def start(tickers_size, tickers_pool, algorithm_param):
                variable_type = 'int',
                # variable_type_mixed = vartype
                variable_boundaries = varbound,
-               algorithm_parameters = algorithm_param)
+               algorithm_parameters = algorithm_param,
+               tickers_pool = tickers_pool, prices_pool = prices_pool
+               )
     model.run()
     solution = model.output_dict
     df = pd.DataFrame.from_dict(solution)
@@ -161,26 +165,27 @@ def start(tickers_size, tickers_pool, algorithm_param):
 
 
 def main(root_list = None):
-    global prices_pool, tickers_pool
     extra = ['TMF', 'SOXL', 'ARKW', 'ARKK', 'SMH', 'SOXX']
-    tickers_pool = createTickerpool(extra_tickers = extra)
-    algorithm_param = create_algorithm_param(max_num_iteration = None, population_size = 500)
-    beginDate = datetime.date(2015, 7, 31)
-    endDate = datetime.date(2018, 7, 31)
+    tickers_pool = createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = False, bool_levETF = False,
+                                    extra_tickers = None)
+    algorithm_param = create_algorithm_param(max_num_iteration = None, population_size = 500, multiprocessing_ncpus =
+    24)
+    beginDate = datetime.date(2015, 7, 30)
+    endDate = datetime.date(2018, 7, 30)
     tickers_size = 12
     prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate,
                                                        clean_tickers = False,
                                                        common_dates = True)
     if root_list is None:
-        root_list = start(tickers_size, tickers_pool, algorithm_param)
-
-    report_df, tickers = showResult(root_list, savefig = True)
+        root_list = start(tickers_size, tickers_pool, prices_pool, algorithm_param)
+        root_list = list(set(root_list))
+    report_df, tickers = showResult(root_list, tickers_pool, prices_pool, savefig = True)
     print(tickers)
     print(report_df)
 
     if (datetime.date.today() - endDate) > datetime.timedelta(days = 7):  # if the end date is bigger than current week
-        prices_pool, tickers_pool = backtest.datafeedMysql(tickers, endDate, datetime.datetime.now(), False, True)
-        report_df, tickers = showResult(root_list, savefig = True)
+        prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, endDate, datetime.datetime.now(), False, True)
+        report_df, tickers = showResult(root_list, tickers_pool, prices_pool, savefig = True)
         print(tickers)
         print(report_df)
 
@@ -189,8 +194,9 @@ def main(root_list = None):
 
 
 if __name__ == '__main__':
-    global prices_pool, tickers_pool
     root_list_manual = None
-    root_list_manual = ['LRCX', 'NOW', 'SCO', 'TQQQ', 'ALGN', 'MKTX', 'NVDA', 'ADSK', 'PAYC', 'AMD', 'NUGT', 'SOXL',
-                        'DRIP']
+    # root_list_manual = [35.,  7., 12., 45., 19.,  3.,  8., 44., 29., 45., 25., 25.]
+    # root_list_manual = list(set(root_list_manual))
+    # root_list_manual = ['LRCX', 'NOW', 'SCO', 'TQQQ', 'ALGN', 'MKTX', 'NVDA', 'ADSK', 'PAYC', 'AMD', 'NUGT', 'SOXL',
+    #                     'DRIP']
     main(root_list_manual)

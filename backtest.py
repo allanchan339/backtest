@@ -35,10 +35,12 @@ def createTradingpandas(beginDate, endDate):
 
 
 def readMysql(ticker, beginDate, endDate, clean_tickers = True):
-    sql = f''' SELECT Date, Close FROM `{ticker}` WHERE DATE(Date) > '{beginDate}' AND DATE (Date) <= '{endDate}'
+    sql = f''' SELECT Date, Close FROM `{ticker}` WHERE DATE(Date) >= '{beginDate}' AND DATE (Date) <= '{endDate}'
     '''
     engine = conn()
-    df = pd.read_sql(sql, engine, index_col = 'Date')
+    connect = engine.connect()
+    df = pd.read_sql(sql, connect, index_col = 'Date')
+    connect.close()
     engine.dispose()  # a good practice to kill engine
     if clean_tickers:
         df.rename(columns = {'Close': f'{ticker.lower()}'}, inplace = True)
@@ -81,25 +83,38 @@ def datafeedMysql(tickers, beginDate, endDate, clean_tickers = True, common_date
     return temp, tickers
 
 
-def code_list(bool_ALL = True, bool_SPX = True, bool_ETF = True, engine = None, extra_tickers = None):
+def code_list(ALL = True, SPX = True, ETF = True, lev_ETF = True, engine = None, extra_tickers = None):
     if engine is None:
         engine = conn()
     connect = engine.connect()
 
     SPXlist = pd.read_sql_table('SPXlist', connect)['code'].values.tolist()
     ETFlist = pd.read_sql_table('ETFlist', connect)['code'].values.tolist()
+    ETFlist_leverage = pd.read_sql_table('ETFlist_leverage', connect)['code'].values.tolist()
     code = pd.read_sql_table('TICKER', connect)['code'].values.tolist()
+    connect.close()
     engine.dispose()
-    if bool_ALL:
-        return code #yes, extra must be bounded by ALL
-    if bool_SPX and bool_ETF:
+    if ALL: #TODO: change to use dict
+        return code
+    elif SPX and ETF and lev_ETF:
+        code = SPXlist + ETFlist + ETFlist_leverage
+    elif SPX and ETF:
         code = SPXlist + ETFlist
-    elif bool_SPX:
+    elif SPX and lev_ETF:
+        code = SPXlist + ETFlist_leverage
+    elif ETF and lev_ETF:
+        code = ETFlist + ETFlist_leverage
+    elif SPX:
         code = SPXlist
-    elif bool_ETF:
+    elif ETF:
         code = ETFlist
+    elif lev_ETF:
+        code = ETFlist_leverage
+    else:
+        return 0
     if extra_tickers is not None:
         code += extra_tickers
+    code = list(sorted(set(code)))
     return code
 
 def readReportCSV(report):
