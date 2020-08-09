@@ -48,10 +48,12 @@ def readMysql(ticker, beginDate, endDate, clean_tickers = True):
         df.rename(columns = {'Close': f'{ticker}'}, inplace = True)
     return df
 
+def findDfShape(df):
+    return df.shape[0]
 
 def datafeedMysql(tickers, beginDate, endDate, clean_tickers = True, common_dates = True):
     temp = createTradingpandas(beginDate, endDate)
-    df_list = []  # df_dict = {}
+    empty = []
     # with concurrent.futures.ProcessPoolExecutor() as executor:
         #using for loop is a much stable method
         # for i, file in zip(tickers, executor.map(readMysql, tickers, itertools.repeat(beginDate), itertools.repeat(endDate),
@@ -61,25 +63,50 @@ def datafeedMysql(tickers, beginDate, endDate, clean_tickers = True, common_date
    #to many connection will cause bugs??
     with concurrent.futures.ProcessPoolExecutor(max_workers = min(int(os.cpu_count()), 12)) as executor:
         df_list = executor.map(readMysql, tickers, itertools.repeat(beginDate), itertools.repeat(endDate),
-                               itertools.repeat(clean_tickers))
-    df_list = list(df_list)  # only if the result take outside, the merge can be done
+                                           itertools.repeat(clean_tickers))
+        df_list = list(df_list)
+        shape_list = executor.map(findDfShape, df_list)
+        shape_list = list(shape_list)
+        for key, value in zip(tickers, shape_list):
+            if value <= max(shape_list)*0.95:
+                empty.append(key)
+
     print(f'Combining {len(df_list)} tickers')
-    for df in df_list:
-        if df.empty:
-            tickers.remove(df.columns)
-        else:
-            temp = temp.join(df)
+    temp = pd.concat(df_list, axis = 1).sort_index()
 
     while all(temp.iloc[-1].isnull().values.tolist()):  # if last row is all empty
         temp = temp.head(-1)  # is used to kill the last row
 
     if common_dates:
-        temp1 = temp.head(1)
-        is_NaN = temp1.isnull()
+        temp = temp.drop(empty, axis = 1)
+
+        is_NaN = pd.concat([temp.tail(1), temp.head(1)]).isnull()*1
+        is_NaN = is_NaN.sum().to_frame().transpose()
         is_NaN = is_NaN.columns[(is_NaN > 0).all()].values.tolist()
         temp.drop(columns = is_NaN, inplace = True)
-        tickers = [ticker for ticker in tickers if ticker not in is_NaN]
+        tickers = temp.columns.to_list()
+        temp.fillna(method = 'ffill', inplace = True)
         temp.dropna(inplace = True)
+    # for df in df_list: #so fucking slow here
+    #     if df.empty:
+    #         tickers.remove(df.columns)
+    #     else:
+    #         temp = temp.join(df)
+    #         print(df.shape)
+    # while all(temp.iloc[-1].isnull().values.tolist()):  # if last row is all empty
+    #     temp = temp.head(-1)  # is used to kill the last row
+    #
+    # if common_dates:
+    #     temp1 = pd.concat([temp.tail(1), temp.head(1)])
+    #     is_NaN = temp1.isnull()*1
+    #     is_NaN = is_NaN.sum().to_frame().transpose()
+    #     print(is_NaN)
+    #     is_NaN = is_NaN.columns[(is_NaN > 0).all()].values.tolist()
+    #     print(is_NaN)
+    #     temp.drop(columns = is_NaN, inplace = True)
+    #     tickers = [ticker for ticker in tickers if ticker not in is_NaN]
+    #     temp.dropna(inplace = True)
+    temp.index = pd.to_datetime(temp.index)
     return temp, tickers
 
 

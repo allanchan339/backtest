@@ -139,6 +139,12 @@ def createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = True, bool_le
                      extra_tickers = None):
     tickers_pool = backtest.code_list(bool_ALL, bool_SPX, bool_ETF, bool_levETF, engine, extra_tickers)
     tickers_pool.remove('TT')  # the data in yahoo is problematic
+    tickers_pool.remove('^DJI')
+    tickers_pool.remove('^GSPC')
+    tickers_pool.remove('^HSI')
+    tickers_pool.remove('^IXIC')
+    tickers_pool.remove('^RUT')
+    tickers_pool.remove('^VIX')
     return tickers_pool
 
 
@@ -166,16 +172,17 @@ def start(tickers_size, tickers_pool, prices_pool, algorithm_param):
 
 def main(root_list = None):
     extra = ['TMF', 'SOXL', 'ARKW', 'ARKK', 'SMH', 'SOXX']
-    tickers_pool = createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = False, bool_levETF = False,
-                                    extra_tickers = None)
+    tickers_pool = createTickerpool(bool_ALL = True, bool_SPX = True, bool_ETF = True, bool_levETF = True,
+                                    extra_tickers = extra)
     algorithm_param = create_algorithm_param(max_num_iteration = None, population_size = 500, multiprocessing_ncpus =
     24)
-    beginDate = datetime.date(2015, 7, 30)
+    beginDate = datetime.date(2012, 7, 30)
     endDate = datetime.date(2018, 7, 30)
     tickers_size = 12
     prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate,
                                                        clean_tickers = False,
                                                        common_dates = True)
+    print(prices_pool)
     if root_list is None:
         root_list = start(tickers_size, tickers_pool, prices_pool, algorithm_param)
         root_list = list(set(root_list))
