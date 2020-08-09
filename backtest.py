@@ -61,6 +61,7 @@ def datafeedMysql(tickers, beginDate, endDate, clean_tickers = True, common_date
         #     df_list.append(file)
         #     print(df_list)
    #to many connection will cause bugs??
+    print(f'Reading data for {len(tickers)} tickers')
     with concurrent.futures.ProcessPoolExecutor(max_workers = min(int(os.cpu_count()), 12)) as executor:
         df_list = executor.map(readMysql, tickers, itertools.repeat(beginDate), itertools.repeat(endDate),
                                            itertools.repeat(clean_tickers))
@@ -87,6 +88,7 @@ def datafeedMysql(tickers, beginDate, endDate, clean_tickers = True, common_date
         tickers = temp.columns.to_list()
         temp.fillna(method = 'ffill', inplace = True)
         temp.dropna(inplace = True)
+
     # for df in df_list: #so fucking slow here
     #     if df.empty:
     #         tickers.remove(df.columns)
@@ -107,6 +109,7 @@ def datafeedMysql(tickers, beginDate, endDate, clean_tickers = True, common_date
     #     tickers = [ticker for ticker in tickers if ticker not in is_NaN]
     #     temp.dropna(inplace = True)
     temp.index = pd.to_datetime(temp.index)
+    print(f'Returning {len(tickers)} valid tickers')
     return temp, tickers
 
 

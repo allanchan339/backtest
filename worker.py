@@ -69,11 +69,24 @@ def showResult(root_list, tickers_pool, prices_pool, savefig = False):
                                      bt.algos.Rebalance(),
                                      ]
                              )
-    backtest_equal = bt.Backtest(equal, prices)
-    backtest_inverese = bt.Backtest(inverseVol, prices)
-    # report = bt.run(backtest_equal)
-    report = bt.run(backtest_inverese)
-    report_df = backtest.readReportCSV(report)
+    try:
+        backtest_equal = bt.Backtest(equal, prices)
+        backtest_inverese = bt.Backtest(inverseVol, prices)
+        # report = bt.run(backtest_equal)
+        report = bt.run(backtest_inverese)
+        report_df = backtest.readReportCSV(report)
+
+    except Exception as e:
+        print(e)
+        print('The following calculation is wrong, please CHECK')
+        print(tickers)
+        print(prices)
+        report_df = pd.DataFrame({
+                'CAGR': [0],
+                'Calmar Ratio': 0
+                })
+        report_df = report_df.transpose()
+
     if savefig:
         plot_return = report.plot()
         plt.savefig(nameof(plot_return))
@@ -122,17 +135,24 @@ def f(X, kwargs):
     # X is a list, storing my genes
     # use it and calculate calmar ratio, then -ve it
     report_df, tickers = showResult(X, tickers_pool, prices_pool)  # is a really bad writing method
-    CAGR = report_df.loc['CAGR'].values.tolist()[0]
-    CAGR = float(str(CAGR).strip('%'))
-    calmar = report_df.loc['Calmar Ratio'].values
-    calmar = float(calmar)
+    try:
+        CAGR = report_df.loc['CAGR'].values.tolist()[0]
+        CAGR = float(str(CAGR).strip('%'))
+        calmar = report_df.loc['Calmar Ratio'].values
+        calmar = float(calmar)
+    except ValueError:
+        print('The following set of ticker have some problem, please CHECK ')
+        print(tickers)
+        print(prices_pool[tickers].dropna())
+        CAGR = 0
+        calmar = 0
     # print(tickers)
     # print(report_df.head(10))
     if report_df.loc['Win 12m %'].values == '-':
         return 0
     # elif calmar > 3:
     #     return -0.1 * calmar
-    return -0.4 * CAGR + 0.6 * (-calmar + max(calmar - 3, 0))  # well i need to max.
+    return -0.4 * CAGR + 0.6 * (-calmar + max(calmar - 5, 0))  # well i need to max.
 
 
 def createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = True, bool_levETF = True, engine = None,
@@ -182,7 +202,6 @@ def main(root_list = None):
     prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate,
                                                        clean_tickers = False,
                                                        common_dates = True)
-    print(prices_pool)
     if root_list is None:
         root_list = start(tickers_size, tickers_pool, prices_pool, algorithm_param)
         root_list = list(set(root_list))
