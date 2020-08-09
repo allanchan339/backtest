@@ -83,7 +83,8 @@ def showResult(root_list, tickers_pool, prices_pool, savefig = False):
         print(prices)
         report_df = pd.DataFrame({
                 'CAGR': [0],
-                'Calmar Ratio': 0
+                'Calmar Ratio': 0,
+                'Win 12m %': '-'
                 })
         report_df = report_df.transpose()
 
