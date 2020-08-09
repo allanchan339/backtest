@@ -50,7 +50,7 @@ def showResult(root_list, tickers_pool, prices_pool, savefig = False):
         tickers = root_list
     else:
         tickers = [tickers_pool[int(i)] for i in root_list]
-
+        tickers.append('TMF')
     prices = prices_pool[tickers].dropna()
     equal = bt.Strategy('Equal',
                         algos = [
@@ -72,8 +72,8 @@ def showResult(root_list, tickers_pool, prices_pool, savefig = False):
     try:
         backtest_equal = bt.Backtest(equal, prices)
         backtest_inverese = bt.Backtest(inverseVol, prices)
-        # report = bt.run(backtest_equal)
-        report = bt.run(backtest_inverese)
+        report = bt.run(backtest_equal)
+        # report = bt.run(backtest_inverese)
         report_df = backtest.readReportCSV(report)
 
     except Exception as e:
@@ -153,19 +153,20 @@ def f(X, kwargs):
         return 0
     # elif calmar > 3:
     #     return -0.1 * calmar
-    return -0.4 * CAGR + 0.6 * (-calmar + max(calmar - 5, 0))  # well i need to max.
+    return -0.4 * CAGR + 0.6 * (-calmar + max(calmar - 4, 0))  # well i need to max.
 
 
 def createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = True, bool_levETF = True, engine = None,
                      extra_tickers = None):
     tickers_pool = backtest.code_list(bool_ALL, bool_SPX, bool_ETF, bool_levETF, engine, extra_tickers)
     tickers_pool.remove('TT')  # the data in yahoo is problematic
-    tickers_pool.remove('^DJI')
-    tickers_pool.remove('^GSPC')
-    tickers_pool.remove('^HSI')
-    tickers_pool.remove('^IXIC')
-    tickers_pool.remove('^RUT')
-    tickers_pool.remove('^VIX')
+    if bool_ALL:
+        tickers_pool.remove('^DJI')
+        tickers_pool.remove('^GSPC')
+        tickers_pool.remove('^HSI')
+        tickers_pool.remove('^IXIC')
+        tickers_pool.remove('^RUT')
+        tickers_pool.remove('^VIX')
     return tickers_pool
 
 
@@ -192,13 +193,14 @@ def start(tickers_size, tickers_pool, prices_pool, algorithm_param):
 
 
 def main(root_list = None):
-    extra = ['TMF', 'SOXL', 'ARKW', 'ARKK', 'SMH', 'SOXX']
-    tickers_pool = createTickerpool(bool_ALL = True, bool_SPX = True, bool_ETF = True, bool_levETF = True,
+    extra = ['TMF', 'SOXX']
+    tickers_pool = createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = True, bool_levETF = True,
                                     extra_tickers = extra)
     algorithm_param = create_algorithm_param(max_num_iteration = None, population_size = 500, multiprocessing_ncpus =
     24)
     beginDate = datetime.date(2012, 7, 30)
-    endDate = datetime.date(2018, 7, 30)
+    # endDate = datetime.date(2018, 7, 30)
+    endDate = datetime.date.today()
     tickers_size = 12
     prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate,
                                                        clean_tickers = False,
@@ -222,7 +224,7 @@ def main(root_list = None):
 
 if __name__ == '__main__':
     root_list_manual = None
-    # root_list_manual = [35.,  7., 12., 45., 19.,  3.,  8., 44., 29., 45., 25., 25.]
+    # root_list_manual = [464., 433.,  10., 459., 693.,  90.,  32., 155., 620., 418., 446., 453.]
     # root_list_manual = list(set(root_list_manual))
     # root_list_manual = ['LRCX', 'NOW', 'SCO', 'TQQQ', 'ALGN', 'MKTX', 'NVDA', 'ADSK', 'PAYC', 'AMD', 'NUGT', 'SOXL',
     #                     'DRIP']
