@@ -1,8 +1,6 @@
 import bt
 import backtest
-import matplotlib
 import pandas as pd
-import platform
 import matplotlib.pyplot as plt
 import datetime
 import random
@@ -11,7 +9,6 @@ from geneticalgorithm import geneticalgorithm as ga
 import os
 from varname import nameof
 
-startTime = datetime.datetime.now()
 
 # pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
@@ -34,27 +31,20 @@ class ApplyLeverage(bt.Algo):
         target.temp['weights'] = target.temp['weights'] * self.leverage
         return True
 
-
-class GenAlgo(object):
-    def __init__(self, tickers_size, algorithm_param, tickers_pool, beginDate, endDate):
-        self.tickers_size = tickers_size
-        self.algorithm_param = algorithm_param
-        self.tickers_pool = tickers_pool
-        self.beginDate = beginDate
-        self.endDate = endDate
-        self.root_list = []
-
-
-def showResult(root_list, tickers_pool, prices_pool, savefig = False):
-    if all(isinstance(root, str) for root in root_list): #test if ticker is converted
+def showResult(root_list, tickers_pool, prices_pool, savefig = False, prefix = None, train = True):
+    if all(isinstance(root, str) for root in root_list):  # test if ticker is converted
         tickers = root_list
+        tickers_size = len(tickers)
     else:
         tickers = [tickers_pool[int(i)] for i in root_list]
-        tickers.append('TMF')
+        tickers_size = len(tickers)
+        tickers.append('GLD')
+        tickers.append('GBTC')
+
     prices = prices_pool[tickers].dropna()
-    equal = bt.Strategy('Equal',
+    equal = bt.Strategy('EqualWeight',
                         algos = [
-                                bt.algos.RunOnce(),
+                                bt.algos.RunMonthly(),
                                 bt.algos.SelectAll(),
                                 bt.algos.WeighEqually(),
                                 bt.algos.Rebalance(),
@@ -71,10 +61,36 @@ def showResult(root_list, tickers_pool, prices_pool, savefig = False):
                              )
     try:
         backtest_equal = bt.Backtest(equal, prices)
-        backtest_inverese = bt.Backtest(inverseVol, prices)
         report = bt.run(backtest_equal)
+
+        # backtest_inverese = bt.Backtest(inverseVol, prices)
         # report = bt.run(backtest_inverese)
+
         report_df = backtest.readReportCSV(report)
+
+        if savefig:
+
+            # prefix = f'{algorithm_param["max_num_iteration"]}_{algorithm_param["population_size"]}_' \
+            #          f'{algorithm_param["max_iteration_without_improv"]}_{algorithm_param["mutation_probability"]}_' \
+            #          f'{algorithm_param["elit_ratio"]}_{algorithm_param["crossover_probability"]}_{algorithm_param["parents_portion"]}_N'
+            prefix = f'./{prefix}_{tickers_size}/'
+            if train:
+                suffix = '_train.jpg'
+            else:
+                suffix = '_test.jpg'
+            plot_return = report.plot()
+            plt.savefig(prefix+nameof(plot_return)+suffix)
+            plot_weights = report.plot_security_weights()
+            plt.savefig(prefix+nameof(plot_weights)+suffix)
+            # plot_scatter_matrix = report.plot_scatter_matrix()
+            # plt.savefig(nameof(plot_scatter_matrix))
+            plot_correlation = report.plot_correlation()
+            plt.savefig(prefix+nameof(plot_correlation)+suffix)
+            plot_histrograms = report.plot_histograms()
+            plt.savefig(prefix+nameof(plot_histrograms)+suffix)
+            plot_prices = prices.plot()
+            plt.savefig(prefix+nameof(plot_prices)+suffix)
+            plt.close('all')
 
     except Exception as e:
         print(e)
@@ -88,31 +104,18 @@ def showResult(root_list, tickers_pool, prices_pool, savefig = False):
                 })
         report_df = report_df.transpose()
 
-    if savefig:
-        plot_return = report.plot()
-        plt.savefig(nameof(plot_return))
-        plot_weights = report.plot_security_weights()
-        plt.savefig(nameof(plot_weights))
-        # plot_scatter_matrix = report.plot_scatter_matrix()
-        # plt.savefig(nameof(plot_scatter_matrix))
-        plot_correlation = report.plot_correlation()
-        plt.savefig(nameof(plot_correlation))
-        plot_histrograms = report.plot_histograms()
-        plt.savefig(nameof(plot_histrograms))
-        plot_prices = prices.plot()
-        plt.savefig(nameof(plot_prices))
-
     return report_df, tickers
 
 
-def create_algorithm_param(max_num_iteration = None, population_size = 50, max_iteration_without_improv = 100,
-                           multiprocessing_ncpus = os.cpu_count()):
+def create_algorithm_param(max_num_iteration = None, population_size = 500, max_iteration_without_improv = 100,
+                            mutation_probability = 0.1, elit_ratio = 0.01,
+                           crossover_probability = 0.5, parents_portion = 0.3, multiprocessing_ncpus = os.cpu_count()):
     algorithm_param = {'max_num_iteration': max_num_iteration,
                        'population_size': population_size,
-                       'mutation_probability': 0.1,
-                       'elit_ratio': 0.01,
-                       'crossover_probability': 0.5,
-                       'parents_portion': 0.3,
+                       'mutation_probability': mutation_probability,
+                       'elit_ratio': elit_ratio,
+                       'crossover_probability': crossover_probability,
+                       'parents_portion': parents_portion,
                        'crossover_type': 'uniform',
                        'max_iteration_without_improv': max_iteration_without_improv,
                        'multiprocessing_ncpus': multiprocessing_ncpus,
@@ -153,13 +156,15 @@ def f(X, kwargs):
         return 0
     # elif calmar > 3:
     #     return -0.1 * calmar
-    return -0.4 * CAGR + 0.6 * (-calmar + max(calmar - 4, 0))  # well i need to max.
+    return -0.2 * CAGR + 0.8 * (-calmar + max(calmar - 5, 0))  # well i need to max.
 
 
 def createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = True, bool_levETF = True, engine = None,
                      extra_tickers = None):
     tickers_pool = backtest.code_list(bool_ALL, bool_SPX, bool_ETF, bool_levETF, engine, extra_tickers)
     tickers_pool.remove('TT')  # the data in yahoo is problematic
+    tickers_pool.remove('LUMN') #the ticker is too new
+
     if bool_ALL:
         tickers_pool.remove('^DJI')
         tickers_pool.remove('^GSPC')
@@ -192,40 +197,90 @@ def start(tickers_size, tickers_pool, prices_pool, algorithm_param):
     return root_list
 
 
-def main(root_list = None):
-    extra = ['TMF', 'SOXX']
-    tickers_pool = createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = True, bool_levETF = True,
+def removeUnwantedTickers_pool(tickers_pool, unwanted_tickers_list = None):
+    for ticker in unwanted_tickers_list:
+        if ticker in tickers_pool:
+            tickers_pool.remove(ticker)
+    return tickers_pool
+
+
+def runGA(tickers_size, beginDate, endDate, algorithm_param, prefix, root_list = None, extra = []):
+    startTime = datetime.datetime.now()
+
+    tickers_pool = createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = False, bool_levETF = False,
                                     extra_tickers = extra)
-    algorithm_param = create_algorithm_param(max_num_iteration = None, population_size = 500, multiprocessing_ncpus =
-    24)
-    beginDate = datetime.date(2012, 7, 30)
-    # endDate = datetime.date(2018, 7, 30)
-    endDate = datetime.date.today()
-    tickers_size = 12
+    unwanted_tickers_list = []
+    tickers_pool = removeUnwantedTickers_pool(tickers_pool, unwanted_tickers_list)
     prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate,
                                                        clean_tickers = False,
                                                        common_dates = True)
+
     if root_list is None:
         root_list = start(tickers_size, tickers_pool, prices_pool, algorithm_param)
         root_list = list(set(root_list))
-    report_df, tickers = showResult(root_list, tickers_pool, prices_pool, savefig = True)
-    print(tickers)
-    print(report_df)
+    report_df_train, tickers = showResult(root_list, tickers_pool, prices_pool, savefig = True, prefix = prefix,
+                                          train = True)
 
+    report_df_test = None
+    #In case the test didnt run
     if (datetime.date.today() - endDate) > datetime.timedelta(days = 7):  # if the end date is bigger than current week
+        #used to check the validation of the GA result
         prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, endDate, datetime.datetime.now(), False, True)
-        report_df, tickers = showResult(root_list, tickers_pool, prices_pool, savefig = True)
-        print(tickers)
-        print(report_df)
+        report_df_test, tickers = showResult(tickers, tickers_pool, prices_pool, savefig = True,  prefix = prefix,
+                                             train = False)
 
     endTime = datetime.datetime.now()
-    print(f'{endTime - startTime} is used')
+    usedTime = endTime - startTime
+    return tickers, report_df_train, report_df_test, usedTime
 
+def createFolder(directory):
+    try:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+    except OSError:
+        print ('Error: Creating directory. ' + directory)
+
+
+# Example
+# createFolder('./data/')
+# Creates a folder in the current directory called data
 
 if __name__ == '__main__':
     root_list_manual = None
-    # root_list_manual = [464., 433.,  10., 459., 693.,  90.,  32., 155., 620., 418., 446., 453.]
+    extra = ['TMF', 'SOXX', 'MSFT', 'GLD', 'GBTC','SPY','QQQ']
+    algorithm_param = create_algorithm_param(max_num_iteration = None, population_size = 500, multiprocessing_ncpus =
+    24)
+    beginDate = datetime.date(2015, 9, 3)
+    endDate = datetime.date(2020, 9, 3)
+    tickers_size = 1
+
+    # endDate = datetime.date.today()
+
+    # root_list_manual = [84,334,382,315,166,314,340,36]
     # root_list_manual = list(set(root_list_manual))
     # root_list_manual = ['LRCX', 'NOW', 'SCO', 'TQQQ', 'ALGN', 'MKTX', 'NVDA', 'ADSK', 'PAYC', 'AMD', 'NUGT', 'SOXL',
     #                     'DRIP']
-    main(root_list_manual)
+    root_list_manual = ['QQQ']
+    # root_list_manual = ['PAYC', 'GBTC','AMZN','ETSY','ADBE','NOW','NVDA','AMD']
+    prefix = f'{algorithm_param["max_num_iteration"]}_{algorithm_param["population_size"]}_' \
+             f'{algorithm_param["max_iteration_without_improv"]}_{algorithm_param["mutation_probability"]}_' \
+             f'{algorithm_param["elit_ratio"]}_{algorithm_param["crossover_probability"]}_' \
+             f'{algorithm_param["parents_portion"]}_N'
+    createFolder(f'./{prefix}_{tickers_size}/')
+
+    tickers, report_df_train, report_df_test, usedTime = runGA(tickers_size, beginDate, endDate, algorithm_param, prefix,
+                                                               root_list_manual, extra)
+    tickers_df = pd.DataFrame(tickers).transpose()
+    usedTime = pd.DataFrame({"UsedTime": usedTime}.items())
+    usedTime['UsedTime_str'] = usedTime[1].astype(str)
+    usedTime = usedTime.drop(0, axis = 1).drop(1, axis = 1)
+    print(tickers_df)
+    print(report_df_train)
+    print(usedTime)
+    with pd.ExcelWriter(f'./{prefix}_{tickers_size}/stage1.xlsx', mode = 'A', datetime_format= 'hh:mm:ss.000') as writer:
+        tickers_df.to_excel(writer, sheet_name='train', index=False)
+        tickers_df.to_excel(writer, sheet_name='test', index=False)
+        usedTime.to_excel(writer, sheet_name='train', index=False, startrow = 3)
+        usedTime.to_excel(writer, sheet_name='test', index=False,startrow = 3)
+        report_df_train.to_excel(writer, sheet_name = 'train', startrow = 7)
+        report_df_test.to_excel(writer, sheet_name = 'test', startrow = 7)

@@ -1,13 +1,12 @@
 import backtest
 import datetime
 tickers_pool = []
-# tickers_pool = backtest.SPXlist()
-# tickers_pool += backtest.ETFlist()
-extra = ['TMF', 'SOXL', 'ARKW', 'ARKK', 'SMH', 'SOXX', 'TA', 'OTIS']
+extra = ['GLD']
 tickers_pool += extra
 tickers_pool = list(set(tickers_pool))
 
 beginDate = datetime.date(2015, 1, 1)
+endDate = datetime.date(2020, 9, 15)
 
 endDate = datetime.date.today()
 prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate, clean_tickers = False, common_dates = True)

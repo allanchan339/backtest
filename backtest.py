@@ -89,25 +89,6 @@ def datafeedMysql(tickers, beginDate, endDate, clean_tickers = True, common_date
         temp.fillna(method = 'ffill', inplace = True)
         temp.dropna(inplace = True)
 
-    # for df in df_list: #so fucking slow here
-    #     if df.empty:
-    #         tickers.remove(df.columns)
-    #     else:
-    #         temp = temp.join(df)
-    #         print(df.shape)
-    # while all(temp.iloc[-1].isnull().values.tolist()):  # if last row is all empty
-    #     temp = temp.head(-1)  # is used to kill the last row
-    #
-    # if common_dates:
-    #     temp1 = pd.concat([temp.tail(1), temp.head(1)])
-    #     is_NaN = temp1.isnull()*1
-    #     is_NaN = is_NaN.sum().to_frame().transpose()
-    #     print(is_NaN)
-    #     is_NaN = is_NaN.columns[(is_NaN > 0).all()].values.tolist()
-    #     print(is_NaN)
-    #     temp.drop(columns = is_NaN, inplace = True)
-    #     tickers = [ticker for ticker in tickers if ticker not in is_NaN]
-    #     temp.dropna(inplace = True)
     temp.index = pd.to_datetime(temp.index)
     print(f'Returning {len(tickers)} valid tickers')
     return temp, tickers
