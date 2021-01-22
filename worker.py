@@ -9,7 +9,6 @@ from geneticalgorithm import geneticalgorithm as ga
 import os
 from varname import nameof
 
-
 # pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
@@ -30,6 +29,7 @@ class ApplyLeverage(bt.Algo):
     def __call__(self, target):
         target.temp['weights'] = target.temp['weights'] * self.leverage
         return True
+
 
 def showResult(root_list, tickers_pool, prices_pool, savefig = False, prefix = None, train = True):
     if all(isinstance(root, str) for root in root_list):  # test if ticker is converted
@@ -79,17 +79,17 @@ def showResult(root_list, tickers_pool, prices_pool, savefig = False, prefix = N
             else:
                 suffix = '_test.jpg'
             plot_return = report.plot()
-            plt.savefig(prefix+nameof(plot_return)+suffix)
+            plt.savefig(prefix + nameof(plot_return) + suffix)
             plot_weights = report.plot_security_weights()
-            plt.savefig(prefix+nameof(plot_weights)+suffix)
+            plt.savefig(prefix + nameof(plot_weights) + suffix)
             # plot_scatter_matrix = report.plot_scatter_matrix()
             # plt.savefig(nameof(plot_scatter_matrix))
             plot_correlation = report.plot_correlation()
-            plt.savefig(prefix+nameof(plot_correlation)+suffix)
+            plt.savefig(prefix + nameof(plot_correlation) + suffix)
             plot_histrograms = report.plot_histograms()
-            plt.savefig(prefix+nameof(plot_histrograms)+suffix)
+            plt.savefig(prefix + nameof(plot_histrograms) + suffix)
             plot_prices = prices.plot()
-            plt.savefig(prefix+nameof(plot_prices)+suffix)
+            plt.savefig(prefix + nameof(plot_prices) + suffix)
             plt.close('all')
 
     except Exception as e:
@@ -108,7 +108,7 @@ def showResult(root_list, tickers_pool, prices_pool, savefig = False, prefix = N
 
 
 def create_algorithm_param(max_num_iteration = None, population_size = 500, max_iteration_without_improv = 100,
-                            mutation_probability = 0.1, elit_ratio = 0.01,
+                           mutation_probability = 0.2, elit_ratio = 0.02,
                            crossover_probability = 0.5, parents_portion = 0.3, multiprocessing_ncpus = os.cpu_count()):
     algorithm_param = {'max_num_iteration': max_num_iteration,
                        'population_size': population_size,
@@ -150,12 +150,8 @@ def f(X, kwargs):
         print(prices_pool[tickers].dropna())
         CAGR = 0
         calmar = 0
-    # print(tickers)
-    # print(report_df.head(10))
     if report_df.loc['Win 12m %'].values == '-':
         return 0
-    # elif calmar > 3:
-    #     return -0.1 * calmar
     return -0.2 * CAGR + 0.8 * (-calmar + max(calmar - 5, 0))  # well i need to max.
 
 
@@ -163,7 +159,7 @@ def createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = True, bool_le
                      extra_tickers = None):
     tickers_pool = backtest.code_list(bool_ALL, bool_SPX, bool_ETF, bool_levETF, engine, extra_tickers)
     tickers_pool.remove('TT')  # the data in yahoo is problematic
-    tickers_pool.remove('LUMN') #the ticker is too new
+    tickers_pool.remove('LUMN')  # the ticker is too new
 
     if bool_ALL:
         tickers_pool.remove('^DJI')
@@ -198,9 +194,10 @@ def start(tickers_size, tickers_pool, prices_pool, algorithm_param):
 
 
 def removeUnwantedTickers_pool(tickers_pool, unwanted_tickers_list = None):
-    for ticker in unwanted_tickers_list:
-        if ticker in tickers_pool:
-            tickers_pool.remove(ticker)
+    if unwanted_tickers_list is not None:
+        for ticker in unwanted_tickers_list:
+            if ticker in tickers_pool:
+                tickers_pool.remove(ticker)
     return tickers_pool
 
 
@@ -222,24 +219,25 @@ def runGA(tickers_size, beginDate, endDate, algorithm_param, prefix, root_list =
                                           train = True)
 
     report_df_test = None
-    #In case the test didnt run
+    # In case the test didnt run
     if (datetime.date.today() - endDate) > datetime.timedelta(days = 7):  # if the end date is bigger than current week
-        #used to check the validation of the GA result
+        # used to check the validation of the GA result
         prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, endDate, datetime.datetime.now(), False, True)
-        report_df_test, tickers = showResult(tickers, tickers_pool, prices_pool, savefig = True,  prefix = prefix,
+        report_df_test, tickers = showResult(tickers, tickers_pool, prices_pool, savefig = True, prefix = prefix,
                                              train = False)
 
     endTime = datetime.datetime.now()
     usedTime = endTime - startTime
     return tickers, report_df_train, report_df_test, usedTime
 
+
 def createFolder(directory):
     try:
         if not os.path.exists(directory):
             os.makedirs(directory)
     except OSError:
-        print ('Error: Creating directory. ' + directory)
-
+        print('Error: Creating directory. ' + directory)
+    return f'./{directory}/'
 
 # Example
 # createFolder('./data/')
@@ -247,7 +245,7 @@ def createFolder(directory):
 
 if __name__ == '__main__':
     root_list_manual = None
-    extra = ['TMF', 'SOXX', 'MSFT', 'GLD', 'GBTC','SPY','QQQ']
+    extra = ['TMF', 'SOXX', 'MSFT', 'GLD', 'GBTC', 'SPY', 'QQQ']
     algorithm_param = create_algorithm_param(max_num_iteration = None, population_size = 500, multiprocessing_ncpus =
     24)
     beginDate = datetime.date(2015, 9, 3)
@@ -266,9 +264,10 @@ if __name__ == '__main__':
              f'{algorithm_param["max_iteration_without_improv"]}_{algorithm_param["mutation_probability"]}_' \
              f'{algorithm_param["elit_ratio"]}_{algorithm_param["crossover_probability"]}_' \
              f'{algorithm_param["parents_portion"]}_N'
-    createFolder(f'./{prefix}_{tickers_size}/')
+    temp = createFolder(f'./{prefix}_{tickers_size}/')
 
-    tickers, report_df_train, report_df_test, usedTime = runGA(tickers_size, beginDate, endDate, algorithm_param, prefix,
+    tickers, report_df_train, report_df_test, usedTime = runGA(tickers_size, beginDate, endDate, algorithm_param,
+                                                               prefix,
                                                                root_list_manual, extra)
     tickers_df = pd.DataFrame(tickers).transpose()
     usedTime = pd.DataFrame({"UsedTime": usedTime}.items())
@@ -277,10 +276,11 @@ if __name__ == '__main__':
     print(tickers_df)
     print(report_df_train)
     print(usedTime)
-    with pd.ExcelWriter(f'./{prefix}_{tickers_size}/stage1.xlsx', mode = 'A', datetime_format= 'hh:mm:ss.000') as writer:
-        tickers_df.to_excel(writer, sheet_name='train', index=False)
-        tickers_df.to_excel(writer, sheet_name='test', index=False)
-        usedTime.to_excel(writer, sheet_name='train', index=False, startrow = 3)
-        usedTime.to_excel(writer, sheet_name='test', index=False,startrow = 3)
+    with pd.ExcelWriter(f'./{prefix}_{tickers_size}/stage1.xlsx', mode = 'A',
+                        datetime_format = 'hh:mm:ss.000') as writer:
+        tickers_df.to_excel(writer, sheet_name = 'train', index = False)
+        tickers_df.to_excel(writer, sheet_name = 'test', index = False)
+        usedTime.to_excel(writer, sheet_name = 'train', index = False, startrow = 3)
+        usedTime.to_excel(writer, sheet_name = 'test', index = False, startrow = 3)
         report_df_train.to_excel(writer, sheet_name = 'train', startrow = 7)
         report_df_test.to_excel(writer, sheet_name = 'test', startrow = 7)
