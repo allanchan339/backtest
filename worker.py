@@ -38,8 +38,6 @@ def showResult(root_list, tickers_pool, prices_pool, savefig = False, prefix = N
     else:
         tickers = [tickers_pool[int(i)] for i in root_list]
         tickers_size = len(tickers)
-        tickers.append('GLD')
-        tickers.append('GBTC')
 
     prices = prices_pool[tickers].dropna()
     equal = bt.Strategy('EqualWeight',
@@ -201,13 +199,10 @@ def removeUnwantedTickers_pool(tickers_pool, unwanted_tickers_list = None):
     return tickers_pool
 
 
-def runGA(tickers_size, beginDate, endDate, algorithm_param, prefix, root_list = None, extra = []):
+def runGA(tickers_size, tickers_pool, beginDate, endDate, algorithm_param, prefix, root_list = None, extra = [],
+          saveFigure = True):
     startTime = datetime.datetime.now()
 
-    tickers_pool = createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = False, bool_levETF = False,
-                                    extra_tickers = extra)
-    unwanted_tickers_list = []
-    tickers_pool = removeUnwantedTickers_pool(tickers_pool, unwanted_tickers_list)
     prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate,
                                                        clean_tickers = False,
                                                        common_dates = True)
@@ -215,7 +210,8 @@ def runGA(tickers_size, beginDate, endDate, algorithm_param, prefix, root_list =
     if root_list is None:
         root_list = start(tickers_size, tickers_pool, prices_pool, algorithm_param)
         root_list = list(set(root_list))
-    report_df_train, tickers = showResult(root_list, tickers_pool, prices_pool, savefig = True, prefix = prefix,
+
+    report_df_train, tickers = showResult(root_list, tickers_pool, prices_pool, savefig = saveFigure, prefix = prefix,
                                           train = True)
 
     report_df_test = None
@@ -223,7 +219,7 @@ def runGA(tickers_size, beginDate, endDate, algorithm_param, prefix, root_list =
     if (datetime.date.today() - endDate) > datetime.timedelta(days = 7):  # if the end date is bigger than current week
         # used to check the validation of the GA result
         prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, endDate, datetime.datetime.now(), False, True)
-        report_df_test, tickers = showResult(tickers, tickers_pool, prices_pool, savefig = True, prefix = prefix,
+        report_df_test, tickers = showResult(tickers, tickers_pool, prices_pool, savefig = saveFigure, prefix = prefix,
                                              train = False)
 
     endTime = datetime.datetime.now()
@@ -258,17 +254,22 @@ if __name__ == '__main__':
     # root_list_manual = list(set(root_list_manual))
     # root_list_manual = ['LRCX', 'NOW', 'SCO', 'TQQQ', 'ALGN', 'MKTX', 'NVDA', 'ADSK', 'PAYC', 'AMD', 'NUGT', 'SOXL',
     #                     'DRIP']
-    root_list_manual = ['QQQ']
+    # root_list_manual = ['QQQ']
     # root_list_manual = ['PAYC', 'GBTC','AMZN','ETSY','ADBE','NOW','NVDA','AMD']
     prefix = f'{algorithm_param["max_num_iteration"]}_{algorithm_param["population_size"]}_' \
              f'{algorithm_param["max_iteration_without_improv"]}_{algorithm_param["mutation_probability"]}_' \
              f'{algorithm_param["elit_ratio"]}_{algorithm_param["crossover_probability"]}_' \
              f'{algorithm_param["parents_portion"]}_N'
     temp = createFolder(f'./{prefix}_{tickers_size}/')
+    tickers_pool = createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = False, bool_levETF = False,
+                                    extra_tickers = extra)
+    unwanted_tickers_list = []
+    tickers_pool = removeUnwantedTickers_pool(tickers_pool, unwanted_tickers_list)
 
-    tickers, report_df_train, report_df_test, usedTime = runGA(tickers_size, beginDate, endDate, algorithm_param,
+    tickers, report_df_train, report_df_test, usedTime = runGA(tickers_size, tickers_pool, beginDate, endDate,
+                                                               algorithm_param,
                                                                prefix,
-                                                               root_list_manual, extra)
+                                                               root_list_manual, extra, saveFigure = True)
     tickers_df = pd.DataFrame(tickers).transpose()
     usedTime = pd.DataFrame({"UsedTime": usedTime}.items())
     usedTime['UsedTime_str'] = usedTime[1].astype(str)

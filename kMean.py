@@ -17,7 +17,7 @@ def showCAGRandCalmar(ticker, tickers_pool, prices_pool):
     return result
 
 
-def runKMeanClustering(tickers_pool, beginDate, endDate, showFigure = False):
+def runKMeanClustering(tickers_pool, beginDate, endDate, clusterSize,showFigure = False):
     prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate, clean_tickers = False,
 
                                                        common_dates = True)
@@ -28,11 +28,10 @@ def runKMeanClustering(tickers_pool, beginDate, endDate, showFigure = False):
     print(f'\nCombine {len(result_list)} Calmar ratio and CAGR result')
     result = pd.concat(result_list, axis = 1)
     result = result.transpose()
-    kmeans = KMeans(n_clusters = 5, n_init = 30, max_iter = 3e8, tol = 1e-4, )
+    kmeans = KMeans(n_clusters = clusterSize, n_init = 30, max_iter = 3e8, tol = 1e-4, )
     kmeans.fit(result)
     labels = kmeans.predict(result)
     centroids = kmeans.cluster_centers_
-    print(centroids)
     result['Class'] = labels
     result['Class'] = 'C' + result['Class'].astype(str)
     if showFigure:
@@ -45,8 +44,8 @@ def runKMeanClustering(tickers_pool, beginDate, endDate, showFigure = False):
                         'Class'].values,
                     alpha = 0.3,
                     edgecolors = 'k')
-        for idx, centroids in enumerate(centroids):
-            plt.scatter(*centroids, color = f'C{idx}')
+        for idx, centroid in enumerate(centroids):
+            plt.scatter(*centroid, color = f'C{idx}')
         # plt.xlim(-100, 100)
         # plt.ylim(-20, 20)
         plt.xlabel('CAGR')
@@ -57,8 +56,8 @@ def runKMeanClustering(tickers_pool, beginDate, endDate, showFigure = False):
 
 
 if __name__ == '__main__':
-    tickers_pool = createTickerpool(bool_ALL = False, bool_ETF = True, bool_SPX = True, extra_tickers = [])
+    tickers_pool = createTickerpool(bool_ALL = False, bool_ETF = False, bool_SPX = True, extra_tickers = [])
     tickers_pool = removeUnwantedTickers_pool(tickers_pool, unwanted_tickers_list = None)
     beginDate = datetime.date(2015, 9, 3)
     endDate = datetime.date(2020, 9, 3)
-    df_kMeanResult, centroids = runKMeanClustering(tickers_pool, beginDate, endDate, showFigure = True)
+    df_kMeanResult, centroids = runKMeanClustering(tickers_pool, beginDate, endDate, 5, showFigure = True)

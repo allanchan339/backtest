@@ -90,14 +90,14 @@ def Int2Weigh(X, tickers_pool):
     weighting = dict(zip(tickers_pool, X))
     return weighting
 
-def GAWeighOpt(tickers_list, beginDate, endDate):
+def GAWeighOpt(tickers_list, beginDate, endDate, algorithm_param):
     start_time = datetime.datetime.now()
     tickers_pool = tickers_list
     tickers_size = len(tickers_pool)
     prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate,
                                                        clean_tickers = False,
                                                        common_dates = True)
-    algorithm_param = create_algorithm_param(population_size = 500, multiprocessing_ncpus = 24)
+
     weighting_list = startWeighOpt(tickers_size,tickers_pool,prices_pool,algorithm_param)
 
     folder_name = f'GA_weighting_opt_{tickers_size}_{tickers_list}'
@@ -120,7 +120,9 @@ if __name__ == '__main__':
     beginDate = datetime.date(2015, 9, 3)
     endDate = datetime.date(2020, 9, 3)
     tickers_list = ['PAYC','GBTC','AMZN','ETSY','ADBE','NOW','NVDA','AMD']
-    weighting, report_df_train, report_df_test, usedTime = GAWeighOpt(tickers_list, beginDate, endDate)
+    algorithm_param = create_algorithm_param(population_size = 500, multiprocessing_ncpus = 24)
+    weighting, report_df_train, report_df_test, usedTime = GAWeighOpt(tickers_list, beginDate, endDate,
+                                                                      algorithm_param = algorithm_param)
     print(weighting)
     print(report_df_train)
     print(report_df_test)
