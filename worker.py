@@ -107,7 +107,8 @@ def showResult(root_list, tickers_pool, prices_pool, savefig = False, prefix = N
 
 def create_algorithm_param(max_num_iteration = None, population_size = 500, max_iteration_without_improv = 100,
                            mutation_probability = 0.2, elit_ratio = 0.02,
-                           crossover_probability = 0.5, parents_portion = 0.3, multiprocessing_ncpus = os.cpu_count()):
+                           crossover_probability = 0.5, parents_portion = 0.3, multiprocessing_ncpus = os.cpu_count(),
+                           function_timeout = 20):
     algorithm_param = {'max_num_iteration': max_num_iteration,
                        'population_size': population_size,
                        'mutation_probability': mutation_probability,
@@ -117,7 +118,8 @@ def create_algorithm_param(max_num_iteration = None, population_size = 500, max_
                        'crossover_type': 'uniform',
                        'max_iteration_without_improv': max_iteration_without_improv,
                        'multiprocessing_ncpus': multiprocessing_ncpus,
-                       'multiprocessing_engine': None}
+                       'multiprocessing_engine': None,
+                       "function_timeout": function_timeout}
     return algorithm_param
 
 
@@ -182,7 +184,7 @@ def start(tickers_size, tickers_pool, prices_pool, algorithm_param):
                # variable_type_mixed = vartype
                variable_boundaries = varbound,
                algorithm_parameters = algorithm_param,
-               tickers_pool = tickers_pool, prices_pool = prices_pool
+               tickers_pool = tickers_pool, prices_pool = prices_pool, function_timeout = 30
                )
     model.run()
     solution = model.output_dict

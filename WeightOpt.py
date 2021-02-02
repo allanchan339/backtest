@@ -27,9 +27,9 @@ def backtestWeigh(X, tickers_pool, prices_pool, savefig = False, folder = None, 
             tickers_size = len(X)
             prefix = folder
             if train:
-                suffix = '_train.jpg'
+                suffix = '_train_opt.jpg'
             else:
-                suffix = '_test.jpg'
+                suffix = '_test_opt.jpg'
             plot_return = report.plot()
             plt.savefig(prefix + nameof(plot_return) + suffix)
             plot_weights = report.plot_security_weights()
@@ -62,20 +62,24 @@ def g(X, kwargs):
     prices_pool = kwargs.get('prices_pool')
     report_df, weighting = backtestWeigh(X, tickers_pool, prices_pool)
     CAGR = report_df.loc['CAGR'].values.tolist()[0]
-    CAGR = float(str(CAGR).strip('%'))
     calmar = report_df.loc['Calmar Ratio'].values
-    calmar = float(calmar)
+
+    try:
+        CAGR = float(str(CAGR).strip('%'))
+        calmar = float(calmar)
+    except:
+        return 0
     return -0.2 * CAGR + 0.8 * (-calmar + max(calmar - 5, 0))  # well i need to max.
 
 
 def startWeighOpt(tickers_size, tickers_pool, prices_pool, algorithm_param):
-    varbound = np.array([[0, 100]] * tickers_size)
+    varbound = np.array([[0, 1]] * tickers_size)
     model = ga(function = g,
                dimension = tickers_size,
-               variable_type = 'int',
+               variable_type = 'real',
                variable_boundaries = varbound,
                algorithm_parameters = algorithm_param,
-               tickers_pool = tickers_pool, prices_pool = prices_pool)
+               tickers_pool = tickers_pool, prices_pool = prices_pool, function_timeout = 30)
     model.run()
     solution = model.output_dict
     # df = pd.DataFrame.from_dict(solution)
@@ -84,9 +88,10 @@ def startWeighOpt(tickers_size, tickers_pool, prices_pool, algorithm_param):
     return weighting_list
 
 def Int2Weigh(X, tickers_pool):
+    # can be used to ensure the sum = 1
     norm = np.linalg.norm(X)
     X = X/norm
-    X = [0 if i < 0 else i for i in X]
+    X = [0 if i < 0 else i for i in X] #to scan if negative number exists
     weighting = dict(zip(tickers_pool, X))
     return weighting
 
