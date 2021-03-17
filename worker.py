@@ -31,18 +31,17 @@ class ApplyLeverage(bt.Algo):
         return True
 
 
-def showResult(root_list, tickers_pool, prices_pool, savefig = False, prefix = None, train = True):
+def showResult(root_list, tickers_pool, prices_pool, savefig = False, prefix = None, train = True, i = None):
     if all(isinstance(root, str) for root in root_list):  # test if ticker is converted
         tickers = root_list
         tickers_size = len(tickers)
     else:
         tickers = [tickers_pool[int(i)] for i in root_list]
         tickers_size = len(tickers)
-
     prices = prices_pool[tickers].dropna()
     equal = bt.Strategy('EqualWeight',
                         algos = [
-                                bt.algos.RunMonthly(),
+                                bt.algos.RunOnce(),
                                 bt.algos.SelectAll(),
                                 bt.algos.WeighEqually(),
                                 bt.algos.Rebalance(),
@@ -71,11 +70,18 @@ def showResult(root_list, tickers_pool, prices_pool, savefig = False, prefix = N
             # prefix = f'{algorithm_param["max_num_iteration"]}_{algorithm_param["population_size"]}_' \
             #          f'{algorithm_param["max_iteration_without_improv"]}_{algorithm_param["mutation_probability"]}_' \
             #          f'{algorithm_param["elit_ratio"]}_{algorithm_param["crossover_probability"]}_{algorithm_param["parents_portion"]}_N'
-            prefix = f'./{prefix}_{tickers_size}/'
+            prefix = f'./{prefix}/'
             if train:
-                suffix = '_train.jpg'
+                if i is not None:
+                    suffix = f'_train_{i}.jpg'
+                else:
+                    suffix = '_train.jpg'
             else:
-                suffix = '_test.jpg'
+                if i is not None:
+                    suffix = f'_test_{i}.jpg'
+                else:
+                    suffix = '_test.jpg'
+
             plot_return = report.plot()
             plt.savefig(prefix + nameof(plot_return) + suffix)
             plot_weights = report.plot_security_weights()
@@ -123,11 +129,11 @@ def create_algorithm_param(max_num_iteration = None, population_size = 500, max_
     return algorithm_param
 
 
-def checkDuplicate(X):
+def checkDuplicate(X, tickers_pool_no):
     temp = len(X)
     X = list(set(X))
     while len(X) != temp:
-        X.append(random.randint(min(X), max(X)))
+        X.append(random.randint(0, tickers_pool_no-1))
         X = list(set(X))
     return X
 
@@ -135,7 +141,8 @@ def checkDuplicate(X):
 def f(X, kwargs):
     tickers_pool = kwargs.get('tickers_pool')
     prices_pool = kwargs.get('prices_pool')
-    X = checkDuplicate(X)
+    X = checkDuplicate(X, len(tickers_pool))
+    print(sorted(X))
     # X is a list, storing my genes
     # use it and calculate calmar ratio, then -ve it
     report_df, tickers = showResult(X, tickers_pool, prices_pool)  # is a really bad writing method
@@ -150,9 +157,13 @@ def f(X, kwargs):
         print(prices_pool[tickers].dropna())
         CAGR = 0
         calmar = 0
-    if report_df.loc['Win 12m %'].values == '-':
-        return 0
-    return -0.2 * CAGR + 0.8 * (-calmar + max(calmar - 5, 0))  # well i need to max.
+    # if report_df.loc['Win 12m %'].values == '-':
+    #     return 0
+    # print(CAGR)
+    # print(calmar)
+    # y = -0.2 * CAGR + 0.8 * (-calmar + max(calmar - 5, 0))
+    y = -(0.2*CAGR+0.8*calmar)
+    return np.round(y, 5)  # well i need to max.
 
 
 def createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = True, bool_levETF = True, engine = None,
@@ -184,7 +195,8 @@ def start(tickers_size, tickers_pool, prices_pool, algorithm_param):
                # variable_type_mixed = vartype
                variable_boundaries = varbound,
                algorithm_parameters = algorithm_param,
-               tickers_pool = tickers_pool, prices_pool = prices_pool, function_timeout = 30
+               tickers_pool = tickers_pool, prices_pool = prices_pool,
+               function_timeout = 20
                )
     model.run()
     solution = model.output_dict
@@ -201,28 +213,31 @@ def removeUnwantedTickers_pool(tickers_pool, unwanted_tickers_list = None):
     return tickers_pool
 
 
-def runGA(tickers_size, tickers_pool, beginDate, endDate, algorithm_param, prefix, root_list = None, extra = [],
-          saveFigure = True):
+def runGA(tickers_size, tickers_pool, beginDate, endDate, algorithm_param, prefix, root_list =
+None, extra = [], saveFigure = True, testEndDate = None, i = None):
     startTime = datetime.datetime.now()
 
     prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate,
                                                        clean_tickers = False,
                                                        common_dates = True)
-
     if root_list is None:
         root_list = start(tickers_size, tickers_pool, prices_pool, algorithm_param)
         root_list = list(set(root_list))
-
     report_df_train, tickers = showResult(root_list, tickers_pool, prices_pool, savefig = saveFigure, prefix = prefix,
-                                          train = True)
+                                          train = True, i = i)
 
     report_df_test = None
     # In case the test didnt run
-    if (datetime.date.today() - endDate) > datetime.timedelta(days = 7):  # if the end date is bigger than current week
-        # used to check the validation of the GA result
+    if testEndDate is None:
+        # if (datetime.date.today() - endDate) > datetime.timedelta(days = 7):  # if the end date is bigger than current week
+            # used to check the validation of the GA result
         prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, endDate, datetime.datetime.now(), False, True)
         report_df_test, tickers = showResult(tickers, tickers_pool, prices_pool, savefig = saveFigure, prefix = prefix,
-                                             train = False)
+                                             train = False, i = i)
+    else:
+        prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, endDate, testEndDate, False, True)
+        report_df_test, tickers = showResult(tickers, tickers_pool, prices_pool, savefig = saveFigure, prefix = prefix,
+                                         train = False, i = i)
 
     endTime = datetime.datetime.now()
     usedTime = endTime - startTime
@@ -246,8 +261,8 @@ if __name__ == '__main__':
     extra = ['TMF', 'SOXX', 'MSFT', 'GLD', 'GBTC', 'SPY', 'QQQ']
     algorithm_param = create_algorithm_param(max_num_iteration = None, population_size = 500, multiprocessing_ncpus =
     24)
-    beginDate = datetime.date(2015, 9, 3)
-    endDate = datetime.date(2020, 9, 3)
+    beginDate = datetime.date(2015, 1, 1)
+    endDate = datetime.date(2020, 12, 31)
     tickers_size = 1
 
     # endDate = datetime.date.today()

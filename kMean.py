@@ -17,7 +17,9 @@ def showCAGRandCalmar(ticker, tickers_pool, prices_pool):
     return result
 
 
-def runKMeanClustering(tickers_pool, beginDate, endDate, clusterSize,showFigure = False):
+def runKMeanClustering(tickers_pool, beginDate, endDate, clusterSize,saveFigure = False, prefix = None, i = None):
+    if i is None:
+        i = ''
     prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate, clean_tickers = False,
 
                                                        common_dates = True)
@@ -34,7 +36,7 @@ def runKMeanClustering(tickers_pool, beginDate, endDate, clusterSize,showFigure 
     centroids = kmeans.cluster_centers_
     result['Class'] = labels
     result['Class'] = 'C' + result['Class'].astype(str)
-    if showFigure:
+    if saveFigure:
         fig = plt.figure()
         # plt.scatter(x = result['CAGR'].values.astype(float), y = result['Calmar Ratio'].values.astype(float))
         # plt.savefig('test')
@@ -50,8 +52,14 @@ def runKMeanClustering(tickers_pool, beginDate, endDate, clusterSize,showFigure 
         # plt.ylim(-20, 20)
         plt.xlabel('CAGR')
         plt.ylabel('Calmar Ratio')
-        plt.show()
-        plt.savefig('kMeansClustering')
+        if prefix is None:
+            plt.savefig('kMeansClustering')
+        else:
+            if i is None:
+                plt.savefig(f'./{prefix}/kMeansClustering')
+            else:
+                plt.savefig(f'./{prefix}/kMeansClustering_{i}')
+
     return result, centroids
 
 

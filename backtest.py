@@ -78,6 +78,10 @@ def datafeedMysql(tickers, beginDate, endDate, clean_tickers = True, common_date
     while all(temp.iloc[-1].isnull().values.tolist()):  # if last row is all empty
         temp = temp.head(-1)  # is used to kill the last row
 
+    while all(temp.iloc[0].isnull().values.tolist()):
+        temp = temp.tail(-1)
+
+    print(temp)
     if common_dates:
         temp = temp.drop(empty, axis = 1)
 

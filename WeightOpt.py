@@ -6,12 +6,49 @@ import itertools
 from matplotlib import pyplot as plt
 import pandas as pd
 
-def backtestWeigh(X, tickers_pool, prices_pool, savefig = False, folder = None, train = True):
+class GAWeightingOpt(bt.Algo):
+    def __init__(self, lookback=pd.DateOffset(months=3),
+                 lag=pd.DateOffset(days=0)):
+        super(GAWeightingOpt, self).__init__()
+        self.lookback = lookback
+        self.lag = lag
+
+    def __call__(self, target):
+        selected = target.temp['selected']
+
+        if len(selected) == 0:
+            target.temp['weights'] = {}
+            return True
+
+        if len(selected) == 1:
+            target.temp['weights'] = {selected[0]: 1.}
+            return True
+
+        t0 = target.now - self.lag
+        prc = target.universe[selected].loc[t0 - self.lookback:t0]
+
+    def startGA(self, tickers_size, tickers_pool, prices_pool, algorithm_param):
+        varbound = np.array([[0, 1]] * tickers_size)
+        model = ga(function = g,
+                   dimension = tickers_size,
+                   variable_type = 'real',
+                   variable_boundaries = varbound,
+                   algorithm_parameters = algorithm_param,
+                   tickers_pool = tickers_pool, prices_pool = prices_pool, function_timeout = 30)
+        model.run()
+        solution = model.output_dict
+        # df = pd.DataFrame.from_dict(solution)
+        df = pd.DataFrame.from_dict(solution)
+        weighting_list = df['variable'].values.tolist()
+        return weighting_list
+    # how to write a whole GA weigh in a bt package????
+
+def backtestWeigh(X, tickers_pool, prices_pool, savefig = False, folder = None, train = True, i = None):
     prices = prices_pool.dropna()
     weighting = Int2Weigh(X, tickers_pool)
     strategyGA = bt.Strategy('GA',
                      algos = [
-                             bt.algos.RunQuarterly(),
+                             bt.algos.RunOnce(),
                              bt.algos.SelectAll(),
                              bt.algos.WeighSpecified(**weighting),
                              bt.algos.Rebalance(),
@@ -27,9 +64,15 @@ def backtestWeigh(X, tickers_pool, prices_pool, savefig = False, folder = None, 
             tickers_size = len(X)
             prefix = folder
             if train:
-                suffix = '_train_opt.jpg'
+                if i is not None:
+                    suffix = f'_train_opt_{i}.jpg'
+                else:
+                    suffix = '_train_opt.jpg'
             else:
-                suffix = '_test_opt.jpg'
+                if i is not None:
+                    suffix = f'_test_opt_{i}.jpg'
+                else:
+                    suffix = '_test_opt.jpg'
             plot_return = report.plot()
             plt.savefig(prefix + nameof(plot_return) + suffix)
             plot_weights = report.plot_security_weights()
@@ -67,9 +110,11 @@ def g(X, kwargs):
     try:
         CAGR = float(str(CAGR).strip('%'))
         calmar = float(calmar)
+        y = -(0.2*CAGR+0.8*calmar)
+        # y = -0.2 * CAGR + 0.8 * (-calmar + max(calmar - 5, 0))  # well i need to max.
     except:
         return 0
-    return -0.2 * CAGR + 0.8 * (-calmar + max(calmar - 5, 0))  # well i need to max.
+    return y
 
 
 def startWeighOpt(tickers_size, tickers_pool, prices_pool, algorithm_param):
@@ -82,7 +127,6 @@ def startWeighOpt(tickers_size, tickers_pool, prices_pool, algorithm_param):
                tickers_pool = tickers_pool, prices_pool = prices_pool, function_timeout = 30)
     model.run()
     solution = model.output_dict
-    # df = pd.DataFrame.from_dict(solution)
     df = pd.DataFrame.from_dict(solution)
     weighting_list = df['variable'].values.tolist()
     return weighting_list
@@ -95,7 +139,7 @@ def Int2Weigh(X, tickers_pool):
     weighting = dict(zip(tickers_pool, X))
     return weighting
 
-def GAWeighOpt(tickers_list, beginDate, endDate, algorithm_param):
+def GAWeighOpt(tickers_list, beginDate, endDate, algorithm_param, prefix = None, testEndDate = None, i = None):
     start_time = datetime.datetime.now()
     tickers_pool = tickers_list
     tickers_size = len(tickers_pool)
@@ -104,19 +148,25 @@ def GAWeighOpt(tickers_list, beginDate, endDate, algorithm_param):
                                                        common_dates = True)
 
     weighting_list = startWeighOpt(tickers_size,tickers_pool,prices_pool,algorithm_param)
-
-    folder_name = f'GA_weighting_opt_{tickers_size}_{tickers_list}'
-    folder_location = createFolder(folder_name)
-
+    if prefix is None:
+        folder_name = f'GA_weighting_opt_{tickers_size}_{tickers_list}'
+        folder_location = createFolder(folder_name)
+    else:
+        folder_location = f'./{prefix}/'
 
     report_df_train, weighting = backtestWeigh(weighting_list, tickers_pool, prices_pool, True, folder = folder_location,
-                                               train = True)
+                                               train = True, i = i)
     report_df_test = []
-    if (datetime.date.today() - endDate) > datetime.timedelta(days = 7):  # if the end date is bigger than current week
+    if testEndDate is None:
         prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, endDate, datetime.datetime.now(), False, True)
         report_df_test, weighting = backtestWeigh(weighting_list, tickers_pool, prices_pool, savefig = True,
                                                 folder = folder_location,
-                                         train = False)
+                                         train = False, i = i)
+    else:
+        prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, endDate, testEndDate, False, True)
+        report_df_test, weighting = backtestWeigh(weighting_list, tickers_pool, prices_pool, savefig = True,
+                                              folder = folder_location,
+                                              train = False, i = i)
 
     usedTime = datetime.datetime.now() - start_time
     return weighting, report_df_train, report_df_test, usedTime
