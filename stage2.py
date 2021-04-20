@@ -26,13 +26,13 @@ def indexResultSaver(index, beginDate, endDate, testEndDate, prefix, saveFigure=
 
 
 def stage2(tickers_pool, beginDate, endDate, kMeans=True, clusterSize=5, GAPortfolio=True, tickerSize=8,
-           GAWeighOpt=True, testEndDate=None, prefix=None, kfold_no=None):
+           GAWeighOpt=True, testEndDate=None, prefix=None, kfold_no=None, target = 'calmar'):
     # report_df_train_opt, report_df_test_opt, report_df_train, report_df_test = []
     # weighting, usedTime, usedTime_opt = []
 
     if kMeans and clusterSize > 1:
         df_kMeanResult, centroids = kMean.runKMeanClustering(tickers_pool, beginDate, endDate, clusterSize,
-                                                             saveFigure=True, prefix=prefix, i=kfold_no)
+                                                             saveFigure=True, prefix=prefix, i=kfold_no, target = target)
         tickers_pool = filterKMeansdf(df_kMeanResult, centroids)
         print(tickers_pool)
 
@@ -58,7 +58,8 @@ def stage2(tickers_pool, beginDate, endDate, kMeans=True, clusterSize=5, GAPortf
                                                                               algorithm_param,
                                                                               prefix,
                                                                               root_list_manual, extra, saveFigure=
-                                                                              True, testEndDate=testEndDate, i=kfold_no)
+                                                                              True, testEndDate=testEndDate,
+                                                                              i=kfold_no, target = target)
         tickers_pool = sorted(tickers)
 
     if GAWeighOpt:
@@ -69,7 +70,8 @@ def stage2(tickers_pool, beginDate, endDate, kMeans=True, clusterSize=5, GAPortf
                                                                                                 testEndDate=
                                                                                                 testEndDate,
                                                                                                 prefix=prefix,
-                                                                                                i=kfold_no)
+                                                                                                i=kfold_no,
+                                                                                                target = target)
     return tickers_pool, weighting, report_df_train, report_df_train_opt, report_df_test, report_df_test_opt,\
            usedTime, usedTime_opt
 
@@ -189,11 +191,15 @@ if __name__ == '__main__':
     for i in range(8, 15, 2):
         # if i <= 12:
         #     continue
-        stage2_cross_valid(tickers_pool_root, beginDate, testEndDate=endDate, kFold=20, clusterSize=3,
+        stage2_cross_valid(tickers_pool_root, beginDate, testEndDate=endDate, kFold=2, clusterSize=2,
                            tickerSize=i, kMeans=True, GAPortfolio=True, GAWeighOpt=True)
-# tickers_pool, weighting, report_df_train, report_df_train_opt, report_df_test, report_df_test_opt, \
-# usedTime, usedTime_opt = stage2(tickers_pool_root, beginDate, endDate, kMeans = True, clusterSize = 4,
-# GAPortfolio =
-# True, tickerSize = 8, GAWeighOpt = True)
-# resultSaver(tickers_pool, weighting, report_df_train, report_df_train_opt, report_df_test, report_df_test_opt, \
-#             usedTime, usedTime_opt, print_result = True, saveResult = True)
+
+
+    # tickers_pool, weighting, report_df_train, report_df_train_opt, report_df_test, report_df_test_opt, usedTime, usedTime_opt \
+    #     = stage2(tickers_pool_root, beginDate, endDate,
+    #                                 kMeans = True,
+    #                                 clusterSize = 2, GAPortfolio = True, tickerSize = 14, GAWeighOpt = True,
+    #              target='calmar')
+
+    # resultSaver(tickers_pool, weighting, report_df_train, report_df_train_opt, report_df_test, report_df_test_opt, \
+    #     usedTime, usedTime_opt, print_result = True, saveResult = False)

@@ -8,26 +8,33 @@ from matplotlib import pyplot as plt
 import pandas as pd
 
 
-def showCAGRandCalmar(ticker, tickers_pool, prices_pool):
+def showCAGRandTarget(ticker, tickers_pool, prices_pool, target):
     tickers = [ticker]
     report_df_train, tickers = showResult(tickers, tickers_pool, prices_pool)
-    result = report_df_train.loc[['CAGR', 'Calmar Ratio']]
+    if target == 'calmar':
+        result = report_df_train.loc[['CAGR', 'Calmar Ratio']]
+    else:
+        result = report_df_train.loc[['CAGR', 'Daily Sharpe']].drop_duplicates()
+        print(result)
+
     result['EqualWeight'] = result['EqualWeight'].str.strip('%')
     result = result.rename(columns = {'EqualWeight': ticker})
     return result
 
 
-def runKMeanClustering(tickers_pool, beginDate, endDate, clusterSize,saveFigure = False, prefix = None, i = None):
+def runKMeanClustering(tickers_pool, beginDate, endDate, clusterSize,saveFigure = False, prefix = None, i = None,
+                       target = 'calmar'):
     if i is None:
         i = ''
     prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate, clean_tickers = False,
 
                                                        common_dates = True)
+
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        result_list = executor.map(showCAGRandCalmar, tickers_pool, itertools.repeat(tickers_pool), itertools.repeat(
-                prices_pool))
+        result_list = executor.map(showCAGRandTarget, tickers_pool, itertools.repeat(tickers_pool), itertools.repeat(
+                prices_pool), itertools.repeat(target))
         result_list = list(result_list)
-    print(f'\nCombine {len(result_list)} Calmar ratio and CAGR result')
+    print(f'\nCombine {len(result_list)} {target} ratio and CAGR result')
     result = pd.concat(result_list, axis = 1)
     result = result.transpose()
     kmeans = KMeans(n_clusters = clusterSize, n_init = 30, max_iter = 3e8, tol = 1e-4, )
@@ -41,17 +48,24 @@ def runKMeanClustering(tickers_pool, beginDate, endDate, clusterSize,saveFigure 
         # plt.scatter(x = result['CAGR'].values.astype(float), y = result['Calmar Ratio'].values.astype(float))
         # plt.savefig('test')
         # plt.clf()
-        plt.scatter(x = result['CAGR'].values.astype(float), y = result['Calmar Ratio'].values.astype(float),
-                    color = result[
-                        'Class'].values,
-                    alpha = 0.3,
-                    edgecolors = 'k')
+        if target == 'calmar':
+            plt.scatter(x = result['CAGR'].values.astype(float), y = result['Calmar Ratio'].values.astype(float),
+                        color = result[
+                            'Class'].values,
+                        alpha = 0.3,
+                        edgecolors = 'k')
+        else:
+            plt.scatter(x = result['CAGR'].values.astype(float), y = result['Daily Sharpe'].values.astype(float),
+                        color = result[
+                            'Class'].values,
+                        alpha = 0.3,
+                        edgecolors = 'k')
         for idx, centroid in enumerate(centroids):
             plt.scatter(*centroid, color = f'C{idx}')
         # plt.xlim(-100, 100)
         # plt.ylim(-20, 20)
         plt.xlabel('CAGR')
-        plt.ylabel('Calmar Ratio')
+        plt.ylabel(f'{target} Ratio')
         if prefix is None:
             plt.savefig('kMeansClustering')
         else:

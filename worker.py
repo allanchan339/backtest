@@ -104,6 +104,7 @@ def showResult(root_list, tickers_pool, prices_pool, savefig = False, prefix = N
         report_df = pd.DataFrame({
                 'CAGR': [0],
                 'Calmar Ratio': 0,
+                'Daily Sharpe': 0,
                 'Win 12m %': '-'
                 })
         report_df = report_df.transpose()
@@ -165,6 +166,32 @@ def f(X, kwargs):
     y = -(0.2*CAGR+0.8*calmar)
     return np.round(y, 5)  # well i need to max.
 
+def f_sharpe(X, kwargs):
+    tickers_pool = kwargs.get('tickers_pool')
+    prices_pool = kwargs.get('prices_pool')
+    X = checkDuplicate(X, len(tickers_pool))
+    print(sorted(X))
+    # X is a list, storing my genes
+    # use it and calculate calmar ratio, then -ve it
+    report_df, tickers = showResult(X, tickers_pool, prices_pool)  # is a really bad writing method
+    try:
+        CAGR = report_df.loc['CAGR'].values.tolist()[0]
+        CAGR = float(str(CAGR).strip('%'))
+        calmar = report_df.loc['Daily Sharpe'].drop_duplicates().values
+        calmar = float(calmar)
+    except ValueError:
+        print('The following set of ticker have some problem, please CHECK ')
+        print(tickers)
+        print(prices_pool[tickers].dropna())
+        CAGR = 0
+        calmar = 0
+    # if report_df.loc['Win 12m %'].values == '-':
+    #     return 0
+    # print(CAGR)
+    # print(calmar)
+    # y = -0.2 * CAGR + 0.8 * (-calmar + max(calmar - 5, 0))
+    return -calmar  # well i need to max.
+
 
 def createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = True, bool_levETF = True, engine = None,
                      extra_tickers = None):
@@ -182,22 +209,33 @@ def createTickerpool(bool_ALL = False, bool_SPX = True, bool_ETF = True, bool_le
     return tickers_pool
 
 
-def start(tickers_size, tickers_pool, prices_pool, algorithm_param):
+def start(tickers_size, tickers_pool, prices_pool, algorithm_param, target = 'calmar'):
     # varbound = np.array([[0.5, 1.5], [1, 100], [0, 1]])
     varbound = np.array([[0, len(tickers_pool) - 1]] * tickers_size)
     # remember to count down 1
     # vartype = np.array([['real'], ['int'], ['int']])
     vartype = np.array([['int'] * tickers_size])
+    if target == 'calmar':
+        model = ga(function = f,  # i cant submit a self.f to ga lib
+                   dimension = tickers_size,
+                   variable_type = 'int',
+                   # variable_type_mixed = vartype
+                   variable_boundaries = varbound,
+                   algorithm_parameters = algorithm_param,
+                   tickers_pool = tickers_pool, prices_pool = prices_pool,
+                   function_timeout = 20
+                   )
+    else:
+        model = ga(function = f_sharpe,  # i cant submit a self.f to ga lib
+                   dimension = tickers_size,
+                   variable_type = 'int',
+                   # variable_type_mixed = vartype
+                   variable_boundaries = varbound,
+                   algorithm_parameters = algorithm_param,
+                   tickers_pool = tickers_pool, prices_pool = prices_pool,
+                   function_timeout = 20
+                   )
 
-    model = ga(function = f,  # i cant submit a self.f to ga lib
-               dimension = tickers_size,
-               variable_type = 'int',
-               # variable_type_mixed = vartype
-               variable_boundaries = varbound,
-               algorithm_parameters = algorithm_param,
-               tickers_pool = tickers_pool, prices_pool = prices_pool,
-               function_timeout = 20
-               )
     model.run()
     solution = model.output_dict
     df = pd.DataFrame.from_dict(solution)
@@ -214,14 +252,14 @@ def removeUnwantedTickers_pool(tickers_pool, unwanted_tickers_list = None):
 
 
 def runGA(tickers_size, tickers_pool, beginDate, endDate, algorithm_param, prefix, root_list =
-None, extra = [], saveFigure = True, testEndDate = None, i = None):
+None, extra = [], saveFigure = True, testEndDate = None, i = None, target = 'calmar'):
     startTime = datetime.datetime.now()
 
     prices_pool, tickers_pool = backtest.datafeedMysql(tickers_pool, beginDate, endDate,
                                                        clean_tickers = False,
                                                        common_dates = True)
     if root_list is None:
-        root_list = start(tickers_size, tickers_pool, prices_pool, algorithm_param)
+        root_list = start(tickers_size, tickers_pool, prices_pool, algorithm_param, target = target)
         root_list = list(set(root_list))
     report_df_train, tickers = showResult(root_list, tickers_pool, prices_pool, savefig = saveFigure, prefix = prefix,
                                           train = True, i = i)

@@ -116,15 +116,40 @@ def g(X, kwargs):
         return 0
     return y
 
+def g_sharpe(X, kwargs):
+    tickers_pool = kwargs.get('tickers_pool')
+    prices_pool = kwargs.get('prices_pool')
+    report_df, weighting = backtestWeigh(X, tickers_pool, prices_pool)
+    CAGR = report_df.loc['CAGR'].values.tolist()[0]
+    calmar = report_df.loc['Daily Sharpe'].drop_duplicates().values
 
-def startWeighOpt(tickers_size, tickers_pool, prices_pool, algorithm_param):
+    try:
+        CAGR = float(str(CAGR).strip('%'))
+        calmar = float(calmar)
+        y = -(0.2*CAGR+0.8*calmar)
+        # y = -0.2 * CAGR + 0.8 * (-calmar + max(calmar - 5, 0))  # well i need to max.
+    except:
+        return 0
+    return -calmar
+
+
+def startWeighOpt(tickers_size, tickers_pool, prices_pool, algorithm_param, target = 'calmar'):
     varbound = np.array([[0, 1]] * tickers_size)
-    model = ga(function = g,
-               dimension = tickers_size,
-               variable_type = 'real',
-               variable_boundaries = varbound,
-               algorithm_parameters = algorithm_param,
-               tickers_pool = tickers_pool, prices_pool = prices_pool, function_timeout = 30)
+    if target == 'calmar':
+        model = ga(function = g,
+                   dimension = tickers_size,
+                   variable_type = 'real',
+                   variable_boundaries = varbound,
+                   algorithm_parameters = algorithm_param,
+                   tickers_pool = tickers_pool, prices_pool = prices_pool, function_timeout = 30)
+    else:
+        model = ga(function = g_sharpe,
+                   dimension = tickers_size,
+                   variable_type = 'real',
+                   variable_boundaries = varbound,
+                   algorithm_parameters = algorithm_param,
+                   tickers_pool = tickers_pool, prices_pool = prices_pool, function_timeout = 30)
+
     model.run()
     solution = model.output_dict
     df = pd.DataFrame.from_dict(solution)
@@ -135,11 +160,13 @@ def Int2Weigh(X, tickers_pool):
     # can be used to ensure the sum = 1
     norm = np.linalg.norm(X)
     X = X/norm
+    X = X/np.sum(X)
     X = [0 if i < 0 else i for i in X] #to scan if negative number exists
     weighting = dict(zip(tickers_pool, X))
     return weighting
 
-def GAWeighOpt(tickers_list, beginDate, endDate, algorithm_param, prefix = None, testEndDate = None, i = None):
+def GAWeighOpt(tickers_list, beginDate, endDate, algorithm_param, prefix = None, testEndDate = None, i = None,
+               target = 'calmar'):
     start_time = datetime.datetime.now()
     tickers_pool = tickers_list
     tickers_size = len(tickers_pool)
@@ -147,7 +174,7 @@ def GAWeighOpt(tickers_list, beginDate, endDate, algorithm_param, prefix = None,
                                                        clean_tickers = False,
                                                        common_dates = True)
 
-    weighting_list = startWeighOpt(tickers_size,tickers_pool,prices_pool,algorithm_param)
+    weighting_list = startWeighOpt(tickers_size,tickers_pool,prices_pool,algorithm_param, target = target)
     if prefix is None:
         folder_name = f'GA_weighting_opt_{tickers_size}_{tickers_list}'
         folder_location = createFolder(folder_name)
