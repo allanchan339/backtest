@@ -26,17 +26,17 @@ def indexResultSaver(index, beginDate, endDate, testEndDate, prefix, saveFigure=
 
 
 def stage2(tickers_pool, beginDate, endDate, kMeans=True, clusterSize=5, GAPortfolio=True, tickerSize=8,
-           GAWeighOpt=True, testEndDate=None, prefix=None, kfold_no=None, target = 'calmar'):
+           GAWeighOpt=True, testEndDate=None, prefix=None, kfold_no=None, target='calmar'):
     # report_df_train_opt, report_df_test_opt, report_df_train, report_df_test = []
     # weighting, usedTime, usedTime_opt = []
 
-    if kMeans and clusterSize > 1:
+    if kMeans and clusterSize>1:
         df_kMeanResult, centroids = kMean.runKMeanClustering(tickers_pool, beginDate, endDate, clusterSize,
-                                                             saveFigure=True, prefix=prefix, i=kfold_no, target = target)
+                                                             saveFigure=True, prefix=prefix, i=kfold_no, target=target)
         tickers_pool = filterKMeansdf(df_kMeanResult, centroids)
         print(tickers_pool)
 
-    if len(tickers_pool) < tickerSize:
+    if len(tickers_pool)<tickerSize:
         raise Exception("Sorry, the ticker pool has lower number than required ticker size")
     if GAPortfolio:
         tickers = []
@@ -59,7 +59,7 @@ def stage2(tickers_pool, beginDate, endDate, kMeans=True, clusterSize=5, GAPortf
                                                                               prefix,
                                                                               root_list_manual, extra, saveFigure=
                                                                               True, testEndDate=testEndDate,
-                                                                              i=kfold_no, target = target)
+                                                                              i=kfold_no, target=target)
         tickers_pool = sorted(tickers)
 
     if GAWeighOpt:
@@ -71,7 +71,7 @@ def stage2(tickers_pool, beginDate, endDate, kMeans=True, clusterSize=5, GAPortf
                                                                                                 testEndDate,
                                                                                                 prefix=prefix,
                                                                                                 i=kfold_no,
-                                                                                                target = target)
+                                                                                                target=target)
     return tickers_pool, weighting, report_df_train, report_df_train_opt, report_df_test, report_df_test_opt,\
            usedTime, usedTime_opt
 
@@ -181,25 +181,66 @@ True, tickerSize=8, GAWeighOpt=True, kFold=5):
                     SPY_train, Index_test=SPY_test, Index=SPY_index)
 
 
-if __name__ == '__main__':
-    tickers_pool_root = worker.createTickerpool(bool_ALL=False, bool_ETF=True, bool_SPX=True, bool_levETF=False,
-                                                extra_tickers=\
-                                                    [])
+def tickers_pool_creation(bool_ALL=False, bool_ETF=True, bool_SPX=True, bool_levETF=False,
+                          extra_tickers=[]):
+    tickers_pool_root = worker.createTickerpool(bool_ALL=bool_ALL, bool_ETF=bool_ETF, bool_SPX=bool_SPX,
+                                                bool_levETF=bool_levETF,
+                                                extra_tickers=extra_tickers)
     tickers_pool_root = worker.removeUnwantedTickers_pool(tickers_pool_root, unwanted_tickers_list=None)
-    beginDate = datetime.date(2015, 1, 1)
-    endDate = datetime.date(2021, 2, 12)
-    for i in range(8, 15, 2):
-        # if i <= 12:
-        #     continue
-        stage2_cross_valid(tickers_pool_root, beginDate, testEndDate=endDate, kFold=2, clusterSize=2,
-                           tickerSize=i, kMeans=True, GAPortfolio=True, GAWeighOpt=True)
+    return tickers_pool_root
 
 
-    # tickers_pool, weighting, report_df_train, report_df_train_opt, report_df_test, report_df_test_opt, usedTime, usedTime_opt \
-    #     = stage2(tickers_pool_root, beginDate, endDate,
-    #                                 kMeans = True,
-    #                                 clusterSize = 2, GAPortfolio = True, tickerSize = 14, GAWeighOpt = True,
-    #              target='calmar')
+def fullReport(tickers_pool_root, beginDate, endDate, testEndDate,
+               kMeans=True,
+               clusterSize=2, GAPortfolio=True, tickerSize=14, GAWeighOpt=True,
+               target='calmar'):
+    tickers_pool, weighting, report_df_train, report_df_train_opt, report_df_test, report_df_test_opt, usedTime, \
+    usedTime_opt\
+        = stage2(tickers_pool_root, beginDate, endDate,
+                 kMeans=kMeans,
+                 clusterSize=clusterSize, GAPortfolio=GAPortfolio, tickerSize=tickerSize, GAWeighOpt=GAWeighOpt,
+                 target=target)
 
-    # resultSaver(tickers_pool, weighting, report_df_train, report_df_train_opt, report_df_test, report_df_test_opt, \
-    #     usedTime, usedTime_opt, print_result = True, saveResult = False)
+    resultSaver(tickers_pool, weighting, report_df_train, report_df_train_opt, report_df_test, report_df_test_opt,\
+                usedTime, usedTime_opt, print_result=True, saveResult=False)
+
+
+if __name__ == '__main__':
+    tickers_pool_root = tickers_pool_creation(bool_ALL=False, bool_ETF=True, bool_SPX=True, bool_levETF=False,
+                                              extra_tickers=[])
+    fullReport(tickers_pool_root,
+               beginDate=datetime.date(2015, 1, 1),
+               endDate=datetime.date(2020, 6, 12),
+               testEndDate=datetime.date(2021, 2, 12),
+               clusterSize=2,
+               tickerSize=14,
+               kMeans=True,
+               GAPortfolio=True,
+               GAWeighOpt=True,
+               )
+
+    # stage2_cross_valid(tickers_pool_root,
+    #                    datetime.date(2015, 1, 1),
+    #                    testEndDate=datetime.date(2021, 2, 12),
+    #                    kFold=1,
+    #                    clusterSize=2,
+    #                    tickerSize=8,
+    #                    kMeans=True,
+    #                    GAPortfolio=True,
+    #                    GAWeighOpt=True)
+
+# beginDate = datetime.date(2015, 1, 1)
+# endDate = datetime.date(2021, 2, 12)
+
+# for i in range(8, 15, 2):
+#     # if i <= 12:
+#     #     continue
+#     stage2_cross_valid(tickers_pool_root,
+#                        beginDate,
+#                        testEndDate=endDate,
+#                        kFold=2,
+#                        clusterSize=2,
+#                        tickerSize=i,
+#                        kMeans=True,
+#                        GAPortfolio=True,
+#                        GAWeighOpt=True)
